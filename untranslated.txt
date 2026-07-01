@@ -1,0 +1,45 @@
+{
+  "ar": [
+    "hebrew"
+  ],
+
+  "de": [
+    "hebrew"
+  ],
+
+  "es": [
+    "hebrew"
+  ],
+
+  "fr": [
+    "hebrew"
+  ],
+
+  "he": [
+    "hebrew"
+  ],
+
+  "hi": [
+    "hebrew"
+  ],
+
+  "it": [
+    "hebrew"
+  ],
+
+  "ja": [
+    "hebrew"
+  ],
+
+  "ko": [
+    "hebrew"
+  ],
+
+  "ru": [
+    "hebrew"
+  ],
+
+  "zh": [
+    "hebrew"
+  ]
+}

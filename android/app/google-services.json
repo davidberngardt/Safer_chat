@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "122274903593",
+    "project_id": "safe-chat-bd918",
+    "storage_bucket": "safe-chat-bd918.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:122274903593:android:e80d5fa820b43e2d100e38",
+        "android_client_info": {
+          "package_name": "com.example.safe_chat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDsCnxyI_2GnxNo3dLqnaVKxWgfcB9o0DQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

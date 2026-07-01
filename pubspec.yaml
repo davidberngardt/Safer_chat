@@ -1,0 +1,142 @@
+<<<<<<< HEAD
+name: safer_chat
+description: Secure messaging application
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Основные зависимости
+  http: ^1.2.0
+  http_parser: ^4.0.2
+  flutter_dotenv: ^6.0.0
+  jwt_decoder: ^2.0.1
+  file_picker: ^11.0.2
+  mime: ^2.0.0
+  uuid: ^4.3.3
+  universal_io: ^2.2.2
+  image_picker: ^1.0.7
+  image_cropper: ^12.1.0
+  video_player: ^2.8.6
+  flutter_webrtc: ^1.4.1
+  janus_client: ^2.4.1
+  url_launcher: ^6.2.5
+  chewie: ^1.7.5
+  record: ^6.2.0
+  just_audio: ^0.10.5
+  audioplayers: ^6.0.0
+  share_plus: ^12.0.1
+  qr_flutter: ^4.1.0
+  clipboard: ^3.0.14
+  permission_handler: ^12.0.1
+  dio: ^5.4.3+1
+  path: ^1.9.0
+  path_provider: ^2.1.2
+  provider: ^6.1.2
+  flutter_secure_storage: ^10.0.0
+  shared_preferences: ^2.2.3
+  crypto: ^3.0.3
+  cached_network_image: ^3.3.1
+  intl: ^0.20.2
+
+  # WebSocket - фиксируем стабильную версию для Android
+  web_socket_channel: 2.4.0
+
+  # PUSH-УВЕДОМЛЕНИЯ И ЗВОНКИ
+  flutter_local_notifications: ^21.0.0
+  firebase_messaging: ^16.2.0
+  firebase_core: ^4.7.0
+  flutter_callkit_incoming: ^3.0.0
+  badges: ^3.1.2
+  workmanager: ^0.9.0+3
+
+  connectivity_plus: ^7.1.1
+  audio_session: ^0.2.3
+
+  encrypt: ^5.0.3
+  typed_data: ^1.3.2
+  js: ^0.7.2
+
+  flutter_web_plugins:
+    sdk: flutter
+
+# Фиксируем версии для совместимости
+dependency_overrides:
+  web: 1.1.1
+  web_socket_channel: 3.0.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.1
+
+# ✅ Конфигурация для иконки приложения
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/logo.png"
+
+flutter:
+  uses-material-design: true
+  generate: true
+  
+  assets:
+    - assets/icons/google.png
+    - assets/icons/vk.png
+    - assets/icons/yandex.png
+    - assets/logo.png
+    - assets/logo2.png
+    - assets/sounds/notification.mp3
+    - assets/sounds/call_ringtone.mp3
+    - assets/videos/splash_video.mp4
+    - .env
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter_28pt-Regular.ttf
+        - asset: assets/fonts/Inter_28pt-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter_28pt-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter_28pt-Bold.ttf
+          weight: 700
+=======
+name: safe_chat
+description: A new Flutter project.
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/.env
+>>>>>>> e7f965e679928d0641b99ff395fe996b5c610816
