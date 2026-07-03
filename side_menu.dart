@@ -9,7 +9,7 @@ class SideMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return Drawer(
       child: Container(
-        color: const Color(0xFFFFF9F0),
+        color: const Color(0xFFFFFFFF),
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
@@ -23,12 +23,16 @@ class SideMenu extends StatelessWidget {
                   CircleAvatar(
                     radius: 30,
                     backgroundColor: Colors.white,
-                    child: Icon(Icons.person, size: 40, color: Color(0xFFFFB74D)),
+                    child:
+                        Icon(Icons.person, size: 40, color: Color(0xFFFFB74D)),
                   ),
                   SizedBox(height: 10),
                   Text(
                     'Safer Chat',
-                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: 4),
                   Text(

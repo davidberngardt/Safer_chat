@@ -4,7 +4,7 @@ import 'package:safer_chat/providers/font_scale_provider.dart';
 
 class MessengerTheme {
   // Light Theme Colors
-  static const Color lightBgPrimary = Color(0xFFF8F9FA);
+  static const Color lightBgPrimary = Color(0xFFFFFFFF);
   static const Color lightBgSecondary = Color(0xFFFFFFFF);
   static const Color lightBgTertiary = Color(0xFFF0F2F5);
   static const Color lightTextPrimary = Color(0xFF0A0E27);
@@ -81,13 +81,15 @@ class MessengerTheme {
 
   // Метод для получения масштабированного размера шрифта
   static double scaledFontSize(BuildContext context, double baseSize) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     return baseSize * fontSizeScale;
   }
 
   // Home Page Specific Styles
   static TextStyle homeSectionTitle(BuildContext context) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     return TextStyle(
       fontSize: fontSizeSM * fontSizeScale,
       fontWeight: FontWeight.w600,
@@ -97,7 +99,8 @@ class MessengerTheme {
   }
 
   static TextStyle homeChatName(BuildContext context) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     return TextStyle(
       fontSize: fontSizeBase * fontSizeScale,
       fontWeight: FontWeight.w600,
@@ -106,7 +109,8 @@ class MessengerTheme {
   }
 
   static TextStyle homeChatPreview(BuildContext context) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     return TextStyle(
       fontSize: fontSizeSM * fontSizeScale,
       color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
@@ -114,7 +118,8 @@ class MessengerTheme {
   }
 
   static TextStyle homeChatTime(BuildContext context) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     return TextStyle(
       fontSize: fontSizeXS * fontSizeScale,
       color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
@@ -122,7 +127,8 @@ class MessengerTheme {
   }
 
   static TextStyle homeSearchHint(BuildContext context) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     return TextStyle(
       fontSize: fontSizeBase * fontSizeScale,
       color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
@@ -130,7 +136,8 @@ class MessengerTheme {
   }
 
   // Chat Item Container Style - ТОНЬШЕ ГРАНИЦЫ
-  static BoxDecoration homeChatItemDecoration(BuildContext context, {bool isHovered = false}) {
+  static BoxDecoration homeChatItemDecoration(BuildContext context,
+      {bool isHovered = false}) {
     return BoxDecoration(
       color: Theme.of(context).colorScheme.surface,
       border: Border.all(
@@ -152,7 +159,8 @@ class MessengerTheme {
 
   // Badge Style for Unread Messages
   static BoxDecoration homeBadgeDecoration(BuildContext context) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     return BoxDecoration(
       color: lightAccent,
       shape: BoxShape.circle,
@@ -160,7 +168,8 @@ class MessengerTheme {
   }
 
   static TextStyle homeBadgeText(BuildContext context) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     return TextStyle(
       fontSize: 11.0 * fontSizeScale,
       color: Colors.white,
