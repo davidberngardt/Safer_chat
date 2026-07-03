@@ -51,7 +51,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
   static const Color primaryDarkColor = Color(0xFF388E3C);
   static const Color primaryLightColor = Color(0xFFA5D6A7);
   static const Color secondaryColor = Color(0xFFFFA500);
-  static const Color backgroundColor = Color(0xFFFFFCF3);
+  static const Color backgroundColor = Color(0xFFFFFFFF);
   static const Color errorColor = Color(0xFFD32F2F);
   static const Color linkColor = Color(0xFF1976D2);
   static const Color textColor = Color(0xFF333333);
@@ -81,7 +81,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
     _canResendCode = false;
     _resendTimer = 60;
     _resendCodeTimer?.cancel();
-    
+
     _resendCodeTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_resendTimer > 0) {
         setState(() {
@@ -120,13 +120,16 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
 
     try {
       final url = Uri.parse('${widget.baseUrl}/api/reset-password');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email}),
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'email': email}),
+          )
+          .timeout(const Duration(seconds: 30));
 
-      final Map<String, dynamic> data = jsonDecode(response.body) as Map<String, dynamic>;
+      final Map<String, dynamic> data =
+          jsonDecode(response.body) as Map<String, dynamic>;
 
       setState(() {
         if (response.statusCode == 200 && data['success'] == true) {
@@ -134,15 +137,17 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
           _emailError = null;
           _generalError = null;
         } else {
-          _emailError = data['error']?.toString() ?? AppLocalizations.of(context)!.userNotFound;
+          _emailError = data['error']?.toString() ??
+              AppLocalizations.of(context)!.userNotFound;
         }
       });
-      
+
       if (_emailSent) {
         _startResendTimer();
       }
     } catch (e) {
-      setState(() => _generalError = AppLocalizations.of(context)!.sendingError(e.toString()));
+      setState(() => _generalError =
+          AppLocalizations.of(context)!.sendingError(e.toString()));
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -183,16 +188,19 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
 
     try {
       final url = Uri.parse('${widget.baseUrl}/api/verify-reset-code');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'code': code,
-          'email': email,
-        }),
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'code': code,
+              'email': email,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
 
-      final Map<String, dynamic> data = jsonDecode(response.body) as Map<String, dynamic>;
+      final Map<String, dynamic> data =
+          jsonDecode(response.body) as Map<String, dynamic>;
 
       setState(() {
         if (response.statusCode == 200 && data['success'] == true) {
@@ -201,11 +209,13 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
           _generalError = null;
           _resendCodeTimer?.cancel();
         } else {
-          _codeError = data['error']?.toString() ?? AppLocalizations.of(context)!.wrongCode;
+          _codeError = data['error']?.toString() ??
+              AppLocalizations.of(context)!.wrongCode;
         }
       });
     } catch (e) {
-      setState(() => _generalError = AppLocalizations.of(context)!.verificationError(e.toString()));
+      setState(() => _generalError =
+          AppLocalizations.of(context)!.verificationError(e.toString()));
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -219,7 +229,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
     final newPassword = _newPasswordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
-    final passwordLatinRegex = RegExp(r'^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:"\\|,.<>\/?]+$');
+    final passwordLatinRegex =
+        RegExp(r'^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:"\\|,.<>\/?]+$');
     final passwordUppercaseRegex = RegExp(r'[A-Z]');
     final passwordDigitRegex = RegExp(r'\d');
 
@@ -264,27 +275,32 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
 
     try {
       final url = Uri.parse('${widget.baseUrl}/api/confirm-reset');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'code': code,
-          'email': email,
-          'newPassword': newPassword,
-        }),
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'code': code,
+              'email': email,
+              'newPassword': newPassword,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
 
-      final Map<String, dynamic> data = jsonDecode(response.body) as Map<String, dynamic>;
+      final Map<String, dynamic> data =
+          jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200 && data['success'] == true) {
         if (widget.onLoginPressed != null) {
           widget.onLoginPressed!();
         }
       } else {
-        setState(() => _generalError = data['error']?.toString() ?? AppLocalizations.of(context)!.passwordChangeError);
+        setState(() => _generalError = data['error']?.toString() ??
+            AppLocalizations.of(context)!.passwordChangeError);
       }
     } catch (e) {
-      setState(() => _generalError = AppLocalizations.of(context)!.passwordChangeErrorDetailed(e.toString()));
+      setState(() => _generalError = AppLocalizations.of(context)!
+          .passwordChangeErrorDetailed(e.toString()));
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -339,7 +355,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          
           TextField(
             controller: _emailController,
             decoration: InputDecoration(
@@ -369,9 +384,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
             textInputAction: TextInputAction.done,
             style: const TextStyle(color: textColor),
           ),
-          
           const SizedBox(height: 16),
-          
           ElevatedButton(
             onPressed: _loading ? null : _sendResetEmail,
             style: _primaryButtonStyle(),
@@ -411,7 +424,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -435,9 +447,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
               ],
             ),
           ),
-          
           const SizedBox(height: 24),
-          
           TextField(
             controller: _codeController,
             decoration: InputDecoration(
@@ -466,9 +476,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
             keyboardType: TextInputType.number,
             maxLength: 4,
             buildCounter: (context,
-                {required currentLength,
-                required isFocused,
-                maxLength}) =>
+                    {required currentLength, required isFocused, maxLength}) =>
                 null,
             textInputAction: TextInputAction.done,
             style: const TextStyle(
@@ -479,9 +487,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
             textAlign: TextAlign.center,
             onSubmitted: (_) => _verifyCode(),
           ),
-          
           const SizedBox(height: 24),
-          
           ElevatedButton(
             onPressed: _loading ? null : _verifyCode,
             style: _primaryButtonStyle(),
@@ -502,9 +508,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
                     ),
                   ),
           ),
-          
           const SizedBox(height: 16),
-          
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -515,8 +519,10 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
               TextButton(
                 onPressed: _canResendCode ? _sendResetEmail : null,
                 style: _textButtonStyle().copyWith(
-                  foregroundColor: MaterialStateProperty.resolveWith<Color>((states) {
-                    if (states.contains(MaterialState.disabled)) return lightTextColor;
+                  foregroundColor:
+                      MaterialStateProperty.resolveWith<Color>((states) {
+                    if (states.contains(MaterialState.disabled))
+                      return lightTextColor;
                     return linkColor;
                   }),
                 ),
@@ -526,7 +532,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
               ),
               if (!_canResendCode) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: lightTextColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),
@@ -560,7 +567,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
-        
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -584,9 +590,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
             ],
           ),
         ),
-        
         const SizedBox(height: 24),
-        
         TextField(
           controller: _newPasswordController,
           obscureText: _obscureNewPassword,
@@ -627,9 +631,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
           textInputAction: TextInputAction.next,
           style: const TextStyle(color: textColor),
         ),
-        
         const SizedBox(height: 16),
-        
         TextField(
           controller: _confirmPasswordController,
           obscureText: _obscureConfirmPassword,
@@ -657,7 +659,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
             errorStyle: const TextStyle(color: errorColor),
             suffixIcon: IconButton(
               icon: Icon(
-                _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                _obscureConfirmPassword
+                    ? Icons.visibility_off
+                    : Icons.visibility,
                 color: lightTextColor,
               ),
               onPressed: () {
@@ -671,9 +675,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
           onSubmitted: (_) => _confirmNewPassword(),
           style: const TextStyle(color: textColor),
         ),
-        
         const SizedBox(height: 24),
-        
         ElevatedButton(
           onPressed: _loading ? null : _confirmNewPassword,
           style: _primaryButtonStyle(),
@@ -701,7 +703,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    
+
     return Scaffold(
       backgroundColor: backgroundColor,
       body: SafeArea(
@@ -736,23 +738,22 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
                     ),
                   ),
                   const SizedBox(height: 20),
-                  
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
                     child: _buildFormContent(),
                   ),
-                  
                   const SizedBox(height: 8),
-                  
                   if (_generalError != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
                           color: errorColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: errorColor.withOpacity(0.3)),
+                          border:
+                              Border.all(color: errorColor.withOpacity(0.3)),
                         ),
                         child: Text(
                           _generalError!,
@@ -761,13 +762,13 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
                         ),
                       ),
                     ),
-                  
                   const SizedBox(height: 12),
-                  
                   TextButton(
-                    onPressed: _loading ? null : () {
-                      Navigator.pop(context);
-                    },
+                    onPressed: _loading
+                        ? null
+                        : () {
+                            Navigator.pop(context);
+                          },
                     style: _textButtonStyle(),
                     child: Text(
                       l10n.backToLogin,

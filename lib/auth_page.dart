@@ -27,13 +27,16 @@ class AuthPage extends StatefulWidget {
   State<AuthPage> createState() => _AuthPageState();
 }
 
-class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin {
+class _AuthPageState extends State<AuthPage>
+    with SingleTickerProviderStateMixin {
   late final String baseUrl;
   final AuthService _authService = AuthService();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
-  final TextEditingController _verificationCodeController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
+  final TextEditingController _verificationCodeController =
+      TextEditingController();
 
   bool _isLogin = true;
   bool _loading = false;
@@ -69,7 +72,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
   static const Color primaryDarkColor = Color(0xFF388E3C);
   static const Color primaryLightColor = Color(0xFFA5D6A7);
   static const Color secondaryColor = Color(0xFFFFA500);
-  static const Color backgroundColor = Color(0xFFFFFCF3);
+  static const Color backgroundColor = Color(0xFFFFFFFF);
   static const Color errorColor = Color(0xFFD32F2F);
   static const Color warningColor = Color(0xFFF57C00);
   static const Color linkColor = Color(0xFF1976D2);
@@ -77,10 +80,13 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
   static const Color lightTextColor = Color(0xFF666666);
 
   // Регулярные выражения для валидации
-  static const String _emailPattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$';
-  static const String _passwordPattern = r'^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:"\\|,.<>\/?]+$';
+  static const String _emailPattern =
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$';
+  static const String _passwordPattern =
+      r'^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:"\\|,.<>\/?]+$';
   static const String _codePattern = r'^\d{4}$'; // Только 4 цифры
-  static const String _alphanumericPattern = r'^[a-zA-Z0-9@._%+-]+$'; // Для email локальной части
+  static const String _alphanumericPattern =
+      r'^[a-zA-Z0-9@._%+-]+$'; // Для email локальной части
 
   @override
   void initState() {
@@ -145,7 +151,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
   bool _isValidEmail(String email) {
     final emailRegex = RegExp(_emailPattern);
     if (!emailRegex.hasMatch(email)) return false;
-    
+
     // Проверяем, что локальная часть содержит только допустимые символы
     final localPart = email.split('@')[0];
     final localPartRegex = RegExp(_alphanumericPattern);
@@ -208,19 +214,23 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
 
     try {
       final url = Uri.parse('$baseUrl/api/send-verification-code');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email, // Отправляем уже санитизированный email
-        }),
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'email': email, // Отправляем уже санитизированный email
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
 
-      final Map<String, dynamic> data = jsonDecode(response.body) as Map<String, dynamic>;
+      final Map<String, dynamic> data =
+          jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200) {
         final expiresIn = data['expiresIn'] as int? ?? 300;
-        _codeExpiryTime = DateTime.now().millisecondsSinceEpoch ~/ 1000 + expiresIn;
+        _codeExpiryTime =
+            DateTime.now().millisecondsSinceEpoch ~/ 1000 + expiresIn;
 
         setState(() {
           _isEmailVerificationSent = true;
@@ -234,7 +244,8 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
           if (data['error'] == 'email_exists') {
             _emailError = AppLocalizations.of(context)!.emailAlreadyRegistered;
           } else {
-            _generalError = data['error']?.toString() ?? AppLocalizations.of(context)!.failedToSendCode;
+            _generalError = data['error']?.toString() ??
+                AppLocalizations.of(context)!.failedToSendCode;
           }
         });
       }
@@ -257,14 +268,16 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
 
     if (code.isEmpty) {
       setState(() {
-        _verificationCodeError = AppLocalizations.of(context)!.enterVerificationCode;
+        _verificationCodeError =
+            AppLocalizations.of(context)!.enterVerificationCode;
       });
       return;
     }
 
     if (!_isValidVerificationCode(code)) {
       setState(() {
-        _verificationCodeError = AppLocalizations.of(context)!.codeMustBe4Digits;
+        _verificationCodeError =
+            AppLocalizations.of(context)!.codeMustBe4Digits;
       });
       return;
     }
@@ -278,16 +291,19 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
     try {
       final email = _sanitizeInput(_emailController.text);
       final url = Uri.parse('$baseUrl/api/verify-email-code');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'code': code,
-        }),
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'email': email,
+              'code': code,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
 
-      final Map<String, dynamic> data = jsonDecode(response.body) as Map<String, dynamic>;
+      final Map<String, dynamic> data =
+          jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200 && data['success'] == true) {
         setState(() {
@@ -298,12 +314,14 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
         });
       } else {
         setState(() {
-          _verificationCodeError = data['error']?.toString() ?? AppLocalizations.of(context)!.invalidVerificationCode;
+          _verificationCodeError = data['error']?.toString() ??
+              AppLocalizations.of(context)!.invalidVerificationCode;
         });
       }
     } catch (e) {
       setState(() {
-        _verificationCodeError = '${AppLocalizations.of(context)!.codeVerificationError}: $e';
+        _verificationCodeError =
+            '${AppLocalizations.of(context)!.codeVerificationError}: $e';
       });
     } finally {
       if (mounted) {
@@ -440,15 +458,17 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
     final url = Uri.parse('$baseUrl/api/register');
 
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-          'verificationCode': code,
-        }),
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'email': email,
+              'password': password,
+              'verificationCode': code,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
 
       Map<String, dynamic> data;
       try {
@@ -458,30 +478,35 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
       }
 
       if (response.statusCode == 200 && data['success'] == true) {
-        final loginResponse = await http.post(
-          Uri.parse('$baseUrl/api/login'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'email': email, 'password': password}),
-        ).timeout(const Duration(seconds: 30));
+        final loginResponse = await http
+            .post(
+              Uri.parse('$baseUrl/api/login'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'email': email, 'password': password}),
+            )
+            .timeout(const Duration(seconds: 30));
 
         if (loginResponse.statusCode == 200) {
-          final loginData = jsonDecode(loginResponse.body) as Map<String, dynamic>;
+          final loginData =
+              jsonDecode(loginResponse.body) as Map<String, dynamic>;
           if (loginData['success'] == true) {
             final token = loginData['token'] as String;
             await _authService.saveToken(token);
-            
+
             final userEmail = loginData['email'] as String? ?? email;
             widget.onLogin(token, isFirstLogin: true, userEmail: userEmail);
           } else {
             setState(() {
               _isLogin = true;
-              _generalError = AppLocalizations.of(context)!.registrationSuccessfulLogin;
+              _generalError =
+                  AppLocalizations.of(context)!.registrationSuccessfulLogin;
             });
           }
         } else {
           setState(() {
             _isLogin = true;
-            _generalError = AppLocalizations.of(context)!.registrationSuccessfulLogin;
+            _generalError =
+                AppLocalizations.of(context)!.registrationSuccessfulLogin;
           });
         }
       } else {
@@ -490,18 +515,21 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
             _emailError = AppLocalizations.of(context)!.emailAlreadyRegistered;
             _resetVerification();
           } else if (data['error'] == 'invalid_code') {
-            _verificationCodeError = AppLocalizations.of(context)!.invalidVerificationCode;
+            _verificationCodeError =
+                AppLocalizations.of(context)!.invalidVerificationCode;
             _resetVerification();
           } else if (data['error'] != null) {
             _generalError = data['error'] as String;
           } else {
-            _generalError = '${AppLocalizations.of(context)!.registrationError} (${AppLocalizations.of(context)!.code}: ${response.statusCode})';
+            _generalError =
+                '${AppLocalizations.of(context)!.registrationError} (${AppLocalizations.of(context)!.code}: ${response.statusCode})';
           }
         });
       }
     } catch (e) {
       setState(() {
-        _generalError = '${AppLocalizations.of(context)!.registrationError}: $e';
+        _generalError =
+            '${AppLocalizations.of(context)!.registrationError}: $e';
       });
     } finally {
       if (mounted) {
@@ -555,11 +583,13 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
     final url = Uri.parse('$baseUrl/api/login');
 
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'email': email, 'password': password}),
+          )
+          .timeout(const Duration(seconds: 30));
 
       Map<String, dynamic> data;
       try {
@@ -571,12 +601,13 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
       if (response.statusCode == 200 && data['success'] == true) {
         final token = data['token'] as String;
         await _authService.saveToken(token);
-        
+
         final userEmail = data['email'] as String? ?? email;
         widget.onLogin(token, isFirstLogin: false, userEmail: userEmail);
       } else {
         setState(() {
-          if (response.statusCode == 401 || data['error'] == 'invalid credentials') {
+          if (response.statusCode == 401 ||
+              data['error'] == 'invalid credentials') {
             _passwordError = AppLocalizations.of(context)!.incorrectPassword;
             _remainingAttempts -= 1;
             _showAttemptsCounter = true;
@@ -587,7 +618,8 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
             _generalError = data['error'] as String;
             _showAttemptsCounter = false;
           } else {
-            _generalError = '${AppLocalizations.of(context)!.authError} (${AppLocalizations.of(context)!.code}: ${response.statusCode})';
+            _generalError =
+                '${AppLocalizations.of(context)!.authError} (${AppLocalizations.of(context)!.code}: ${response.statusCode})';
             _showAttemptsCounter = false;
           }
         });
@@ -707,18 +739,21 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                         hintStyle: const TextStyle(color: lightTextColor),
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.grey, width: 1),
+                          borderSide:
+                              const BorderSide(color: Colors.grey, width: 1),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: primaryColor, width: 2),
+                          borderSide:
+                              const BorderSide(color: primaryColor, width: 2),
                         ),
                         errorText: _emailError,
                         errorMaxLines: 2,
@@ -739,25 +774,30 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                         hintStyle: const TextStyle(color: lightTextColor),
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.grey, width: 1),
+                          borderSide:
+                              const BorderSide(color: Colors.grey, width: 1),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: primaryColor, width: 2),
+                          borderSide:
+                              const BorderSide(color: primaryColor, width: 2),
                         ),
                         errorText: _passwordError,
                         errorMaxLines: 2,
                         errorStyle: const TextStyle(color: errorColor),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                             color: lightTextColor,
                           ),
                           onPressed: () {
@@ -806,7 +846,9 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                   ],
 
                   // ========== ЭКРАН ВВОДА EMAIL ДЛЯ РЕГИСТРАЦИИ ==========
-                  if (!_isLogin && !_isEmailVerificationSent && !_isVerificationSuccessful) ...[
+                  if (!_isLogin &&
+                      !_isEmailVerificationSent &&
+                      !_isVerificationSuccessful) ...[
                     TextField(
                       controller: _emailController,
                       decoration: InputDecoration(
@@ -814,18 +856,21 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                         hintStyle: const TextStyle(color: lightTextColor),
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.grey, width: 1),
+                          borderSide:
+                              const BorderSide(color: Colors.grey, width: 1),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: primaryColor, width: 2),
+                          borderSide:
+                              const BorderSide(color: primaryColor, width: 2),
                         ),
                         errorText: _emailError,
                         errorMaxLines: 2,
@@ -874,9 +919,11 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                                   '${appLocalizations.agreeWith} ',
                                   style: const TextStyle(color: textColor),
                                 ),
-                                _buildClickableText(appLocalizations.dataProcessing, 'privacy'),
+                                _buildClickableText(
+                                    appLocalizations.dataProcessing, 'privacy'),
                                 Text(' ${appLocalizations.and} '),
-                                _buildClickableText(appLocalizations.termsOfService, 'terms'),
+                                _buildClickableText(
+                                    appLocalizations.termsOfService, 'terms'),
                               ],
                             ),
                           ),
@@ -885,7 +932,9 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: (_loading || !_agreedToTerms) ? null : _sendVerificationCode,
+                      onPressed: (_loading || !_agreedToTerms)
+                          ? null
+                          : _sendVerificationCode,
                       style: _primaryButtonStyle(),
                       child: _loading
                           ? const SizedBox(
@@ -907,13 +956,16 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                   ],
 
                   // ========== ЭКРАН ВВОДА КОДА ПОДТВЕРЖДЕНИЯ ==========
-                  if (!_isLogin && _isEmailVerificationSent && !_isVerificationSuccessful) ...[
+                  if (!_isLogin &&
+                      _isEmailVerificationSent &&
+                      !_isVerificationSuccessful) ...[
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: primaryColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: primaryColor.withOpacity(0.3)),
+                        border:
+                            Border.all(color: primaryColor.withOpacity(0.3)),
                       ),
                       child: Row(
                         children: [
@@ -939,18 +991,21 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                         hintText: null,
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.grey, width: 1),
+                          borderSide:
+                              const BorderSide(color: Colors.grey, width: 1),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: primaryColor, width: 2),
+                          borderSide:
+                              const BorderSide(color: primaryColor, width: 2),
                         ),
                         errorText: _verificationCodeError,
                         errorMaxLines: 2,
@@ -958,7 +1013,11 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                       ),
                       keyboardType: TextInputType.number,
                       maxLength: 4,
-                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                      buildCounter: (context,
+                              {required currentLength,
+                              required isFocused,
+                              maxLength}) =>
+                          null,
                       textInputAction: TextInputAction.done,
                       style: const TextStyle(
                         color: textColor,
@@ -998,10 +1057,13 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                           style: TextStyle(color: lightTextColor),
                         ),
                         TextButton(
-                          onPressed: _canResendCode ? _sendVerificationCode : null,
+                          onPressed:
+                              _canResendCode ? _sendVerificationCode : null,
                           style: _textButtonStyle().copyWith(
-                            foregroundColor: MaterialStateProperty.resolveWith((states) {
-                              if (states.contains(MaterialState.disabled)) return lightTextColor;
+                            foregroundColor:
+                                MaterialStateProperty.resolveWith((states) {
+                              if (states.contains(MaterialState.disabled))
+                                return lightTextColor;
                               return linkColor;
                             }),
                           ),
@@ -1011,7 +1073,8 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                         ),
                         if (!_canResendCode) ...[
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: lightTextColor.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(4),
@@ -1064,25 +1127,30 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                         hintStyle: const TextStyle(color: lightTextColor),
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.grey, width: 1),
+                          borderSide:
+                              const BorderSide(color: Colors.grey, width: 1),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: primaryColor, width: 2),
+                          borderSide:
+                              const BorderSide(color: primaryColor, width: 2),
                         ),
                         errorText: _passwordError,
                         errorMaxLines: 2,
                         errorStyle: const TextStyle(color: errorColor),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                             color: lightTextColor,
                           ),
                           onPressed: () {
@@ -1093,7 +1161,8 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                         ),
                       ),
                       textInputAction: TextInputAction.next,
-                      onSubmitted: (_) => _confirmPasswordFocusNode.requestFocus(),
+                      onSubmitted: (_) =>
+                          _confirmPasswordFocusNode.requestFocus(),
                       style: const TextStyle(color: textColor),
                     ),
                     const SizedBox(height: 16),
@@ -1106,30 +1175,36 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                         hintStyle: const TextStyle(color: lightTextColor),
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.grey, width: 1),
+                          borderSide:
+                              const BorderSide(color: Colors.grey, width: 1),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: primaryColor, width: 2),
+                          borderSide:
+                              const BorderSide(color: primaryColor, width: 2),
                         ),
                         errorText: _confirmPasswordError,
                         errorMaxLines: 2,
                         errorStyle: const TextStyle(color: errorColor),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                            _obscureConfirmPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                             color: lightTextColor,
                           ),
                           onPressed: () {
                             setState(() {
-                              _obscureConfirmPassword = !_obscureConfirmPassword;
+                              _obscureConfirmPassword =
+                                  !_obscureConfirmPassword;
                             });
                           },
                         ),
@@ -1167,11 +1242,13 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
                           color: errorColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: errorColor.withOpacity(0.3)),
+                          border:
+                              Border.all(color: errorColor.withOpacity(0.3)),
                         ),
                         child: Text(
                           _generalError!,
@@ -1211,13 +1288,17 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                     ),
                   ],
 
-                  if (_remainingAttempts > 0 && _isLogin && _showAttemptsCounter)
+                  if (_remainingAttempts > 0 &&
+                      _isLogin &&
+                      _showAttemptsCounter)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         '${appLocalizations.attemptsLeft}: $_remainingAttempts',
                         style: TextStyle(
-                          color: _remainingAttempts <= 2 ? warningColor : lightTextColor,
+                          color: _remainingAttempts <= 2
+                              ? warningColor
+                              : lightTextColor,
                           fontSize: 13,
                         ),
                       ),
@@ -1242,10 +1323,14 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                     ElevatedButton(
                       onPressed: _loading ? null : _navigateToResetPassword,
                       style: _primaryButtonStyle().copyWith(
-                        backgroundColor: MaterialStateProperty.resolveWith((states) {
-                          if (states.contains(MaterialState.disabled)) return warningColor.withOpacity(0.5);
-                          if (states.contains(MaterialState.hovered)) return warningColor.withOpacity(0.8);
-                          if (states.contains(MaterialState.pressed)) return warningColor.withOpacity(0.8);
+                        backgroundColor:
+                            MaterialStateProperty.resolveWith((states) {
+                          if (states.contains(MaterialState.disabled))
+                            return warningColor.withOpacity(0.5);
+                          if (states.contains(MaterialState.hovered))
+                            return warningColor.withOpacity(0.8);
+                          if (states.contains(MaterialState.pressed))
+                            return warningColor.withOpacity(0.8);
                           return warningColor;
                         }),
                       ),

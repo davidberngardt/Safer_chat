@@ -17,21 +17,23 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     // Получаем API ключ из .env файла
     final apiKey = dotenv.get('OPENAI_API_KEY', fallback: '');
-    
+
     // Проверяем, установлен ли API ключ
-    final hasValidApiKey = apiKey.isNotEmpty && !apiKey.contains('your-actual-api-key');
-    
+    final hasValidApiKey =
+        apiKey.isNotEmpty && !apiKey.contains('your-actual-api-key');
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Safe Chat',
       theme: ThemeData(
         primarySwatch: Colors.orange,
-        scaffoldBackgroundColor: const Color(0xFFFFFCF3),
+        scaffoldBackgroundColor: Colors.white,
       ),
       home: AuthPage(
         onLogin: (token) {
           // При успешном логине перезапускаем приложение с HomePage и провайдерами
-          runApp(MyLoggedInApp(token: token, apiKey: apiKey, hasValidApiKey: hasValidApiKey));
+          runApp(MyLoggedInApp(
+              token: token, apiKey: apiKey, hasValidApiKey: hasValidApiKey));
         },
       ),
     );
@@ -44,8 +46,8 @@ class MyLoggedInApp extends StatelessWidget {
   final bool hasValidApiKey;
 
   const MyLoggedInApp({
-    Key? key, 
-    required this.token, 
+    Key? key,
+    required this.token,
     required this.apiKey,
     required this.hasValidApiKey,
   }) : super(key: key);
@@ -66,7 +68,7 @@ class MyLoggedInApp extends StatelessWidget {
         title: 'Safe Chat',
         theme: ThemeData(
           primarySwatch: Colors.orange,
-          scaffoldBackgroundColor: const Color(0xFFFFFCF3),
+          scaffoldBackgroundColor: Colors.white,
         ),
         home: HomePage(
           token: token,

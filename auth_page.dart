@@ -19,7 +19,8 @@ class AuthPage extends StatefulWidget {
   State<AuthPage> createState() => _AuthPageState();
 }
 
-class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin {
+class _AuthPageState extends State<AuthPage>
+    with SingleTickerProviderStateMixin {
   late final String baseUrl;
 
   final TextEditingController _emailController = TextEditingController();
@@ -108,7 +109,8 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
         _passwordError = 'Пароль должен содержать хотя бы одну цифру';
         hasError = true;
       } else if (!passwordLatinRegex.hasMatch(password)) {
-        _passwordError = 'Пароль должен состоять только из латинских букв и цифр';
+        _passwordError =
+            'Пароль должен состоять только из латинских букв и цифр';
         hasError = true;
       }
     }
@@ -148,7 +150,8 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
           if (!_isLogin && data['error'] == 'email_exists') {
             _emailError = 'Пользователь с таким email уже зарегистрирован';
           } else if (_isLogin &&
-              (response.statusCode == 401 || data['error'] == 'invalid credentials')) {
+              (response.statusCode == 401 ||
+                  data['error'] == 'invalid credentials')) {
             _passwordError = 'Неверный пароль. Попробуйте снова.';
             _remainingAttempts -= 1;
             if (_remainingAttempts <= 0) {
@@ -171,7 +174,8 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
     }
   }
 
-  ButtonStyle _buttonStyle(Color baseColor, Color hoverColor, Color disabledColor) {
+  ButtonStyle _buttonStyle(
+      Color baseColor, Color hoverColor, Color disabledColor) {
     return ButtonStyle(
       backgroundColor: MaterialStateProperty.resolveWith<Color>((states) {
         if (states.contains(MaterialState.disabled)) return disabledColor;
@@ -187,7 +191,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    const backgroundColor = Color(0xFFFFFCF3);
+    const backgroundColor = Colors.white;
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -230,8 +234,8 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                     hintText: 'Email',
                     filled: true,
                     fillColor: Colors.white,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -249,8 +253,8 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                       hintText: _isLogin ? 'Пароль' : 'Придумайте пароль',
                       filled: true,
                       fillColor: Colors.white,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
@@ -258,7 +262,9 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                       errorText: _passwordError,
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                         ),
                         onPressed: () {
                           setState(() {

@@ -1,0 +1,106 @@
+From 68db36a8e7be3bb4db325814ed0735e495475091 Mon Sep 17 00:00:00 2001
+From: Safer Chat Dev <noreply@local>
+Date: Wed, 1 Jul 2026 20:35:15 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=A3=D0=BD=D0=B8=D1=84=D0=B8=D1=86=D0=B8?=
+ =?UTF-8?q?=D1=80=D0=BE=D0=B2=D0=B0=D1=82=D1=8C=20=D1=84=D0=BE=D0=BD:=20?=
+ =?UTF-8?q?=D1=87=D0=B8=D1=81=D1=82=D1=8B=D0=B9=20=D0=B1=D0=B5=D0=BB=D1=8B?=
+ =?UTF-8?q?=D0=B9=20#FFFFFF=20=D0=B2=D0=B5=D0=B7=D0=B4=D0=B5?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- theme.dart: lightBgPrimary 0xFFF8F9FA -> 0xFFFFFFFF (фон главных страниц)
+- auth_page.dart: backgroundColor 0xFFFFFCF3 -> 0xFFFFFFFF
+- reset_password_page.dart: backgroundColor 0xFFFFFCF3 -> 0xFFFFFFFF
+- splash_video_screen.dart: 2x 0xFFFFFCF3 -> 0xFFFFFFFF (Scaffold + AdaptiveLogo)
+- main.dart: splashBgColor 0xFFFFFCF3 -> 0xFFFFFFFF
+
+Устраняет расхождение между фоном страниц и фоном логотипа.
+Тёмная тема не затронута.
+---
+ lib/auth_page.dart           | 3 ++-
+ lib/main.dart                | 3 ++-
+ lib/reset_password_page.dart | 3 ++-
+ lib/splash_video_screen.dart | 5 +++--
+ lib/theme.dart               | 3 ++-
+ 5 files changed, 11 insertions(+), 6 deletions(-)
+
+diff --git a/lib/auth_page.dart b/lib/auth_page.dart
+index c191125..d31cd03 100644
+--- a/lib/auth_page.dart
++++ b/lib/auth_page.dart
+@@ -69,7 +69,8 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
+   static const Color primaryDarkColor = Color(0xFF388E3C);
+   static const Color primaryLightColor = Color(0xFFA5D6A7);
+   static const Color secondaryColor = Color(0xFFFFA500);
+-  static const Color backgroundColor = Color(0xFFFFFCF3);
++  // Единый чистый белый фон для страницы авторизации и фона логотипа
++  static const Color backgroundColor = Color(0xFFFFFFFF);
+   static const Color errorColor = Color(0xFFD32F2F);
+   static const Color warningColor = Color(0xFFF57C00);
+   static const Color linkColor = Color(0xFF1976D2);
+diff --git a/lib/main.dart b/lib/main.dart
+index 798a1be..c9121f9 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -800,7 +800,8 @@ class _AuthPageWrapperState extends State<AuthPageWrapper>
+ 
+   Widget _buildSimpleSplashScreen() {
+     // Простой splash экран без видео - только логотип и лоадер
+-    const splashBgColor = Color(0xFFFFFCF3);
++    // Единый чистый белый фон для splash и логотипа (совпадает с фоном всех страниц)
++    const splashBgColor = Color(0xFFFFFFFF);
+ 
+     return Scaffold(
+       backgroundColor: splashBgColor,
+diff --git a/lib/reset_password_page.dart b/lib/reset_password_page.dart
+index 26a23be..3bda6d9 100644
+--- a/lib/reset_password_page.dart
++++ b/lib/reset_password_page.dart
+@@ -51,7 +51,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
+   static const Color primaryDarkColor = Color(0xFF388E3C);
+   static const Color primaryLightColor = Color(0xFFA5D6A7);
+   static const Color secondaryColor = Color(0xFFFFA500);
+-  static const Color backgroundColor = Color(0xFFFFFCF3);
++  // Единый чистый белый фон для страницы восстановления пароля и фона логотипа
++  static const Color backgroundColor = Color(0xFFFFFFFF);
+   static const Color errorColor = Color(0xFFD32F2F);
+   static const Color linkColor = Color(0xFF1976D2);
+   static const Color textColor = Color(0xFF333333);
+diff --git a/lib/splash_video_screen.dart b/lib/splash_video_screen.dart
+index 28840ab..afc38a3 100644
+--- a/lib/splash_video_screen.dart
++++ b/lib/splash_video_screen.dart
+@@ -161,13 +161,14 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> {
+ 
+   Widget _buildSimpleSplash() {
+     return Scaffold(
+-      backgroundColor: const Color(0xFFFFFCF3),
++      // Единый чистый белый фон (совпадает с фоном страниц и логотипа)
++      backgroundColor: const Color(0xFFFFFFFF),
+       body: Center(
+         child: Column(
+           mainAxisAlignment: MainAxisAlignment.center,
+           children: [
+             const AdaptiveLogo(
+-              backgroundColor: Color(0xFFFFFCF3),
++              backgroundColor: Color(0xFFFFFFFF),
+               size: LogoSize.large,
+             ),
+             const SizedBox(height: 30),
+diff --git a/lib/theme.dart b/lib/theme.dart
+index 85c86ca..7ea8573 100644
+--- a/lib/theme.dart
++++ b/lib/theme.dart
+@@ -4,7 +4,8 @@ import 'package:safer_chat/providers/font_scale_provider.dart';
+ 
+ class MessengerTheme {
+   // Light Theme Colors
+-  static const Color lightBgPrimary = Color(0xFFF8F9FA);
++  // Единый чистый белый фон для всех страниц и фона логотипа
++  static const Color lightBgPrimary = Color(0xFFFFFFFF);
+   static const Color lightBgSecondary = Color(0xFFFFFFFF);
+   static const Color lightBgTertiary = Color(0xFFF0F2F5);
+   static const Color lightTextPrimary = Color(0xFF0A0E27);
+-- 
+2.47.3

@@ -161,13 +161,13 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> {
 
   Widget _buildSimpleSplash() {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFCF3),
+      backgroundColor: const Color(0xFFFFFFFF),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const AdaptiveLogo(
-              backgroundColor: Color(0xFFFFFCF3),
+              backgroundColor: Color(0xFFFFFFFF),
               size: LogoSize.large,
             ),
             const SizedBox(height: 30),

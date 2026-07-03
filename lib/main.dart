@@ -800,7 +800,7 @@ class _AuthPageWrapperState extends State<AuthPageWrapper>
 
   Widget _buildSimpleSplashScreen() {
     // Простой splash экран без видео - только логотип и лоадер
-    const splashBgColor = Color(0xFFFFFCF3);
+    const splashBgColor = Color(0xFFFFFFFF);
 
     return Scaffold(
       backgroundColor: splashBgColor,
