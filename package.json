@@ -1,7 +1,7 @@
 {
-<<<<<<< HEAD
   "name": "safer_chat",
   "version": "1.0.0",
+  "description": "A new Flutter project.",
   "type": "module",
   "main": "server.js",
   "scripts": {
@@ -31,31 +31,14 @@
     "uuid": "^13.0.0",
     "ws": "^8.19.0"
   },
-  "description": "A new Flutter project.",
   "directories": {
     "lib": "lib",
     "test": "test"
-=======
-  "name": "safe_chat_server",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
->>>>>>> e7f965e679928d0641b99ff395fe996b5c610816
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-<<<<<<< HEAD
   "devDependencies": {
     "nodemon": "^3.1.11"
-=======
-  "dependencies": {
-    "crypto-js": "^4.2.0",
-    "dotenv": "^17.2.3",
-    "express": "^5.1.0",
-    "mongodb": "^6.20.0"
->>>>>>> e7f965e679928d0641b99ff395fe996b5c610816
   }
 }
