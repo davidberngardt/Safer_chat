@@ -31,7 +31,6 @@ import 'services/call_screen.dart';
 import '../models/call_history.dart';
 import 'services/api_service.dart';
 
-
 class ChatPage extends StatefulWidget {
   final int myUserId;
   final String baseUrl;
@@ -61,12 +60,14 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin {
+class _ChatPageState extends State<ChatPage>
+    with SingleTickerProviderStateMixin {
   final List<Message> _messages = [];
   final TextEditingController _controller = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode focusNode = FocusNode();
+  final FocusNode _rawKeyboardFocusNode = FocusNode();
 
   late VoiceService _voiceService;
   final MediaService _mediaService = MediaService();
@@ -101,8 +102,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Map<String, dynamic> _contactInfo = {
     'photoUrl': null,
-    'name': '',    
-    'nickname': '', 
+    'name': '',
+    'nickname': '',
     'birthday': 'Не указано',
     'isContact': false,
     'isBlocked': false,
@@ -130,21 +131,21 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   Timer? _highlightTimer;
   bool _hasMarkedAsRead = false;
   int? _contactId;
-  
+
   List<CallHistory> _callHistory = [];
   bool _isLoadingCallHistory = false;
   bool _showCallHistory = false;
 
   bool _isSendingFiles = false;
-  
+
   // WebSocket subscription
   StreamSubscription<Map<String, dynamic>>? _webSocketSubscription;
 
   Future<bool> get _canSendMessage async {
     final hasVoiceMessage = await _voiceService.hasVoiceMessage;
-    return _controller.text.trim().isNotEmpty || 
-           _attachedFiles.isNotEmpty ||
-           hasVoiceMessage;
+    return _controller.text.trim().isNotEmpty ||
+        _attachedFiles.isNotEmpty ||
+        hasVoiceMessage;
   }
 
   Future<bool> get _isSendButtonActive async {
@@ -154,50 +155,53 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    
+
     _voiceService = VoiceService();
     _callService = CallService();
     _webSocketService = WebSocketService();
     _notificationService = NotificationService();
-    
+
     _scrollController.addListener(_scrollListener);
     _tabController = TabController(
       length: EmojiData.categories.length,
       vsync: this,
     );
-    
+
     _initializeServices();
     _loadMessages();
     _loadContactInfo();
     _loadPinnedMessages();
     _checkIfChatBlocked();
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _loadNotificationSettings();
       await _initializeWebSocket();
     });
-    
+
     _startNotificationCheckTimer();
-    
+
     if (kIsWeb) {
       _setupWebContextMenu();
     }
-    
-    _delayedFocusTimer = Timer(const Duration(milliseconds: 300), () {
+
+    // Отложенный фокус на поле ввода
+    _delayedFocusTimer = Timer(const Duration(milliseconds: 500), () {
       if (mounted) {
         focusNode.requestFocus();
+        // Также запрашиваем фокус для RawKeyboardListener
+        _rawKeyboardFocusNode.requestFocus();
       }
     });
-    
+
     _controller.addListener(_updateSendButtonState);
     _setupVoiceServiceListeners();
-    
+
     if (widget.forwardedMessage != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _handleForwardedMessage();
       });
     }
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
@@ -224,12 +228,12 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         baseUrl: widget.baseUrl,
         myUserId: widget.myUserId,
       );
-      
+
       // Подписываемся на сообщения этого чата
       _webSocketSubscription = _webSocketService.onMessage.listen((event) {
         _handleNewWebSocketMessage(event);
       });
-      
+
       print('✅ WebSocket initialized for chat ${widget.chatId}');
     } catch (e) {
       print('❌ Error initializing WebSocket: $e');
@@ -238,16 +242,16 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   void _handleNewWebSocketMessage(Map<String, dynamic> event) {
     final type = event['type'];
-    
+
     if (type == 'new_message') {
       final messageData = event['message'];
       if (messageData == null) return;
-      
+
       final senderId = messageData['user_id'] ?? messageData['userId'];
-      
+
       // Не обрабатываем свои сообщения (они уже добавлены через отправку)
       if (senderId == widget.myUserId) return;
-      
+
       // Создаем объект сообщения
       String? fileUrl = messageData['fileUrl'] ?? messageData['file_url'];
       if (fileUrl != null && !fileUrl.startsWith('http')) {
@@ -256,13 +260,15 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
       DateTime createdAt;
       try {
-        createdAt = DateTime.parse(messageData['createdAt'] ?? messageData['created_at']).toLocal();
+        createdAt = DateTime.parse(
+                messageData['createdAt'] ?? messageData['created_at'])
+            .toLocal();
       } catch (e) {
         createdAt = DateTime.now();
       }
 
       String text = messageData['text'] ?? '';
-      
+
       // Декодируем зашифрованный текст если нужно
       if (text.isNotEmpty && _looksLikeEncrypted(text)) {
         try {
@@ -280,8 +286,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         fileUrl: fileUrl,
         typeId: messageData['typeId'] ?? messageData['type_id'] ?? 1,
         duration: messageData['duration'],
-        isForwarded: messageData['isForwarded'] ?? messageData['is_forwarded'] ?? false,
-        forwardedFrom: messageData['forwardedFrom'] ?? messageData['forwarded_from'],
+        isForwarded:
+            messageData['isForwarded'] ?? messageData['is_forwarded'] ?? false,
+        forwardedFrom:
+            messageData['forwardedFrom'] ?? messageData['forwarded_from'],
       );
 
       // Добавляем сообщение в список
@@ -291,7 +299,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
       // Прокручиваем вниз, если пользователь уже внизу
       if (_scrollController.hasClients) {
-        final isAtBottom = _scrollController.position.pixels >= 
+        final isAtBottom = _scrollController.position.pixels >=
             _scrollController.position.maxScrollExtent - 100;
         if (isAtBottom) {
           _scrollToBottom();
@@ -299,7 +307,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       }
 
       // Помечаем как прочитанное, если окно активно
-      if (mounted && WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      if (mounted &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
         _markChatAsRead();
       }
     }
@@ -311,11 +320,11 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         _isPlaying = isPlaying;
       });
     };
-    
+
     _voiceService.onPlayingMessageIdChanged = (messageId) {
       setState(() {
         _playingMessageId = messageId;
-        
+
         if (messageId != null) {
           _startProgressTimer();
         } else {
@@ -323,13 +332,13 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         }
       });
     };
-    
+
     _voiceService.onRecordingStateChanged = () {
       setState(() {
         focusNode.requestFocus();
       });
     };
-    
+
     _voiceService.onRecordingProgress = () {
       setState(() {});
     };
@@ -356,28 +365,30 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   Future<void> _initializeServices() async {
     try {
       await _voiceService.initialize();
-      
-      _microphonePermissionGranted = await _voiceService.checkMicrophonePermission();
-      
+
+      _microphonePermissionGranted =
+          await _voiceService.checkMicrophonePermission();
+
       _audioAvailable = true;
       _audioInitialized = true;
-      
     } catch (e) {
       _audioInitialized = true;
       _audioAvailable = false;
-      
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showInfoDialog(
           AppLocalizations.of(context)!.voiceMessages,
-          AppLocalizations.of(context)!.voiceMessagesMicrophonePermissionRequired,
+          AppLocalizations.of(context)!
+              .voiceMessagesMicrophonePermissionRequired,
         );
       });
     }
   }
 
   void _showInfoDialog(String title, String message) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -386,11 +397,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(AppLocalizations.of(context)!.gotIt, 
-              style: TextStyle(
-                fontSize: 16 * fontSizeScale,
-                color: MessengerTheme.lightAccent
-              )),
+            child: Text(AppLocalizations.of(context)!.gotIt,
+                style: TextStyle(
+                    fontSize: 16 * fontSizeScale,
+                    color: MessengerTheme.lightAccent)),
           ),
         ],
       ),
@@ -414,44 +424,49 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
       if (userResponse.statusCode == 200) {
         final userData = userResponse.data;
-  
+
         String name = userData['name']?.toString() ?? '';
         final nickname = userData['nickname']?.toString() ?? '';
-        
+
         String formattedBirthday = AppLocalizations.of(context)!.notSpecified;
         if (userData['birthday'] != null) {
           try {
             final birthdayStr = userData['birthday'].toString();
             if (birthdayStr.isNotEmpty && birthdayStr != 'null') {
               final date = DateTime.parse(birthdayStr);
-              formattedBirthday = '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+              formattedBirthday =
+                  '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
             }
           } catch (e) {
             formattedBirthday = userData['birthday'].toString();
           }
         }
-  
+
         final photoUrl = userData['photo_url'];
-  
+
         bool isContact = false;
         int? contactId;
         String contactName = name;
-        
+
         try {
-          final contactsResponse = await dio.get('${widget.baseUrl}/api/contacts');
+          final contactsResponse =
+              await dio.get('${widget.baseUrl}/api/contacts');
           if (contactsResponse.statusCode == 200) {
             final contactsData = contactsResponse.data;
-            if (contactsData['success'] == true && contactsData['contacts'] != null) {
-              final contacts = List<Map<String, dynamic>>.from(contactsData['contacts']);
+            if (contactsData['success'] == true &&
+                contactsData['contacts'] != null) {
+              final contacts =
+                  List<Map<String, dynamic>>.from(contactsData['contacts']);
               final contact = contacts.firstWhere(
                 (c) => c['contact_user_id'] == widget.recipientUserId,
                 orElse: () => <String, dynamic>{},
               );
-              
+
               if (contact.isNotEmpty) {
                 isContact = true;
                 contactId = contact['id'];
-                if (contact['contact_name'] != null && contact['contact_name'].toString().isNotEmpty) {
+                if (contact['contact_name'] != null &&
+                    contact['contact_name'].toString().isNotEmpty) {
                   contactName = contact['contact_name'].toString();
                 }
               }
@@ -460,7 +475,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         } catch (e) {
           // Игнорируем ошибки загрузки контактов
         }
-  
+
         setState(() {
           _contactInfo = {
             'photoUrl': photoUrl,
@@ -505,6 +520,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     _searchController.dispose();
     _scrollController.dispose();
     focusNode.dispose();
+    _rawKeyboardFocusNode.dispose();
     _tabController.dispose();
     _chewieController?.dispose();
     _videoPlayerController?.dispose();
@@ -516,15 +532,15 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     _delayedFocusTimer?.cancel();
     _highlightTimer?.cancel();
     _closeContextMenu();
-    
+
     _markChatAsRead();
-    
+
     super.dispose();
   }
 
   Future<void> _loadPinnedMessages() async {
     if (widget.chatId <= 0) return;
-    
+
     try {
       final dio = Dio();
       dio.options.headers = {
@@ -539,11 +555,11 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       if (response.statusCode == 200) {
         final data = response.data;
         final List<dynamic> pinnedMessagesData = data['pinned_messages'] ?? [];
-        
+
         final messages = pinnedMessagesData.map<Message>((msg) {
           try {
             String text = msg['text']?.toString() ?? '';
-            
+
             if (text.isNotEmpty && _looksLikeEncrypted(text)) {
               try {
                 text = _decodeMessageText(text);
@@ -551,7 +567,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 text = '[Сообщение не может быть отображено]';
               }
             }
-            
+
             if (text.isEmpty || text.trim().isEmpty) {
               final typeId = msg['typeId'] ?? msg['type_id'] ?? 1;
               switch (typeId) {
@@ -574,12 +590,13 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                   text = '📝 Сообщение';
               }
             }
-            
+
             return Message(
               id: msg['id'] ?? 0,
               userId: msg['userId'] ?? msg['user_id'] ?? 0,
               text: text,
-              createdAt: DateTime.parse(msg['createdAt'] ?? msg['created_at']).toLocal(),
+              createdAt: DateTime.parse(msg['createdAt'] ?? msg['created_at'])
+                  .toLocal(),
               typeId: msg['typeId'] ?? msg['type_id'] ?? 1,
             );
           } catch (e) {
@@ -592,7 +609,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
             );
           }
         }).toList();
-        
+
         setState(() {
           _pinnedMessages = messages;
         });
@@ -604,25 +621,25 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   bool _looksLikeEncrypted(String text) {
     if (text.isEmpty) return false;
-    
+
     final hexRegex = RegExp(r'^[0-9a-fA-F]+$');
     if (hexRegex.hasMatch(text.replaceAll(':', ''))) {
       return true;
     }
-    
+
     if (text.length % 4 == 0) {
       final base64Regex = RegExp(r'^[A-Za-z0-9+/]+={0,2}$');
       if (base64Regex.hasMatch(text)) {
         return true;
       }
     }
-    
+
     return false;
   }
 
   String _decodeMessageText(String encryptedText) {
     if (encryptedText.isEmpty) return encryptedText;
-    
+
     try {
       if (encryptedText.contains(':')) {
         final parts = encryptedText.split(':');
@@ -636,15 +653,14 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
             }
           }
         }
-      } 
-      else if (_isValidHex(encryptedText)) {
+      } else if (_isValidHex(encryptedText)) {
         final bytes = _hexStringToBytes(encryptedText);
         final decoded = String.fromCharCodes(bytes);
         if (decoded.isNotEmpty && !_looksLikeEncrypted(decoded)) {
           return decoded;
         }
       }
-      
+
       try {
         final decodedBytes = base64Decode(encryptedText);
         final decoded = String.fromCharCodes(decodedBytes);
@@ -654,11 +670,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       } catch (e) {
         // Не base64
       }
-      
     } catch (e) {
       // Игнорируем ошибки декодирования
     }
-    
+
     return encryptedText;
   }
 
@@ -671,7 +686,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     if (hexString.length % 2 != 0) {
       hexString = '0$hexString';
     }
-    
+
     final length = hexString.length;
     final bytes = Uint8List(length ~/ 2);
     for (var i = 0; i < length; i += 2) {
@@ -686,7 +701,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Future<void> _pinMessage(Message message) async {
     if (widget.chatId <= 0) return;
-    
+
     try {
       final dio = Dio();
       dio.options.headers = {
@@ -706,7 +721,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
             _messages[index] = message.copyWith(isPinned: true);
           }
         });
-        
+
         await _loadPinnedMessages();
       }
     } catch (e) {
@@ -716,7 +731,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Future<void> _unpinMessage(Message message) async {
     if (widget.chatId <= 0) return;
-    
+
     try {
       final dio = Dio();
       dio.options.headers = {
@@ -734,7 +749,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
             _messages[index] = message.copyWith(isPinned: false);
           }
         });
-        
+
         await _loadPinnedMessages();
       }
     } catch (e) {
@@ -742,13 +757,15 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     }
   }
 
-  void _showMessageContextMenu(Message message, TapDownDetails details, BuildContext messageContext) {
+  void _showMessageContextMenu(
+      Message message, TapDownDetails details, BuildContext messageContext) {
     try {
       if (kIsWeb) {
         _selectedMessageForContextMenu = message;
         _showMessageContextMenuAtPosition(message, details.globalPosition);
       } else {
-        final RenderBox renderBox = messageContext.findRenderObject() as RenderBox;
+        final RenderBox renderBox =
+            messageContext.findRenderObject() as RenderBox;
         final offset = renderBox.localToGlobal(details.localPosition);
         _selectedMessageForContextMenu = message;
         _showMessageContextMenuAtPosition(message, offset);
@@ -761,35 +778,35 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   void _showMessageContextMenuAtPosition(Message message, Offset position) {
     _closeContextMenu();
-    
+
     _selectedMessageForContextMenu = message;
     _contextMenuPosition = position;
-    
+
     final screenSize = MediaQuery.of(context).size;
     const double menuWidth = 220.0;
     const double menuHeight = 300.0;
-    
+
     double adjustedX = position.dx;
     double adjustedY = position.dy;
-    
+
     if (adjustedX + menuWidth > screenSize.width) {
       adjustedX = screenSize.width - menuWidth - 10;
     }
-    
+
     if (adjustedY + menuHeight > screenSize.height) {
       adjustedY = screenSize.height - menuHeight - 10;
     }
-    
+
     if (adjustedX < 10) {
       adjustedX = 10;
     }
-    
+
     if (adjustedY < 10) {
       adjustedY = 10;
     }
-    
+
     _contextMenuPosition = Offset(adjustedX, adjustedY);
-    
+
     _contextMenuOverlay = OverlayEntry(
       builder: (context) {
         return Stack(
@@ -833,17 +850,19 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         );
       },
     );
-    
+
     Overlay.of(context).insert(_contextMenuOverlay!);
     _contextMenuOpen = true;
   }
 
   Widget _buildContextMenuContent(Message message) {
-    final favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final favoritesProvider =
+        Provider.of<FavoritesProvider>(context, listen: false);
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     final isFavorite = favoritesProvider.isMessageFavorite(message.id);
     final isMyMessage = message.userId == widget.myUserId;
-    
+
     final isPinned = _pinnedMessages.any((pinned) => pinned.id == message.id);
 
     return SingleChildScrollView(
@@ -856,7 +875,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
             text: isFavorite
                 ? AppLocalizations.of(context)!.removeFromFavorites
                 : AppLocalizations.of(context)!.addToFavorites,
-            color: isFavorite ? Colors.amber : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            color: isFavorite
+                ? Colors.amber
+                : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
             onTap: () {
               _closeContextMenu();
               if (isFavorite) {
@@ -866,13 +887,14 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               }
             },
           ),
-          
           _buildContextMenuItem(
             icon: isPinned ? Icons.push_pin : Icons.push_pin_outlined,
             text: isPinned
                 ? AppLocalizations.of(context)!.unpinMessage
                 : AppLocalizations.of(context)!.pinMessage,
-            color: isPinned ? MessengerTheme.lightAccent : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            color: isPinned
+                ? MessengerTheme.lightAccent
+                : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
             onTap: () {
               _closeContextMenu();
               if (isPinned) {
@@ -882,7 +904,6 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               }
             },
           ),
-          
           _buildContextMenuItem(
             icon: Icons.reply,
             text: AppLocalizations.of(context)!.forward,
@@ -892,7 +913,6 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               _forwardMessage(message);
             },
           ),
-          
           _buildContextMenuItem(
             icon: Icons.copy,
             text: AppLocalizations.of(context)!.copyText,
@@ -902,7 +922,6 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               _copyToClipboard(message.text);
             },
           ),
-          
           if (isMyMessage)
             _buildContextMenuItem(
               icon: Icons.delete,
@@ -924,8 +943,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     Color? color,
     required VoidCallback onTap,
   }) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -936,14 +956,21 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
-              Icon(icon, size: 20 * fontSizeScale, color: color ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+              Icon(icon,
+                  size: 20 * fontSizeScale,
+                  color: color ??
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   text,
                   style: TextStyle(
                     fontSize: 14 * fontSizeScale,
-                    color: color ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                    color: color ??
+                        Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.8),
                   ),
                 ),
               ),
@@ -964,8 +991,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   void _addToFavorites(Message message) {
-    final favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
-    
+    final favoritesProvider =
+        Provider.of<FavoritesProvider>(context, listen: false);
+
     favoritesProvider.addFavoriteMessage(
       originalMessageId: message.id,
       chatId: widget.chatId,
@@ -980,13 +1008,14 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   void _removeFromFavorites(Message message) {
-    final favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
-    
+    final favoritesProvider =
+        Provider.of<FavoritesProvider>(context, listen: false);
+
     try {
       final favMessage = favoritesProvider.favoriteMessages.firstWhere(
         (fav) => fav.originalMessageId == message.id,
       );
-      
+
       favoritesProvider.removeFavoriteMessage(favMessage.id);
     } catch (e) {
       // Игнорируем
@@ -998,10 +1027,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       _showErrorDialog(AppLocalizations.of(context)!.chatIsBlockedCannotSend);
       return;
     }
-    
+
     try {
       final dio = Dio();
-      
+
       dio.options.headers = {
         'Authorization': 'Bearer ${widget.token}',
         'Content-Type': 'application/json',
@@ -1019,28 +1048,29 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       if (message.fileUrl != null && message.fileUrl!.isNotEmpty) {
         try {
           final formData = FormData();
-          
+
           String fileField = 'file';
           if (message.typeId == 4) fileField = 'voice_file';
-          
+
           final response = await dio.get(
             message.fileUrl!,
             options: Options(responseType: ResponseType.bytes),
           );
-          
+
           if (response.statusCode == 200) {
             final bytes = response.data as List<int>;
             final filename = message.fileUrl!.split('/').last;
-            
+
             formData.files.add(MapEntry(
               fileField,
               MultipartFile.fromBytes(bytes, filename: filename),
             ));
             formData.fields.add(MapEntry('chat_id', widget.chatId.toString()));
             formData.fields.add(MapEntry('text', message.text));
-            
+
             if (message.duration != null) {
-              formData.fields.add(MapEntry('duration', message.duration.toString()));
+              formData.fields
+                  .add(MapEntry('duration', message.duration.toString()));
             }
 
             final uploadResponse = await dio.post(
@@ -1050,7 +1080,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
             if (uploadResponse.statusCode == 200) {
               final data = uploadResponse.data;
-              
+
               final tempMsg = Message(
                 id: const Uuid().v4().hashCode,
                 userId: widget.myUserId,
@@ -1087,7 +1117,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                   final index = _messages.indexOf(tempMsg);
                   if (index != -1) {
                     _messages[index] = Message(
-                      id: sendData['message_id'] ?? sendData['id'] ?? tempMsg.id,
+                      id: sendData['message_id'] ??
+                          sendData['id'] ??
+                          tempMsg.id,
                       userId: widget.myUserId,
                       text: message.text,
                       createdAt: DateTime.now(),
@@ -1099,7 +1131,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                     );
                   }
                 });
-                
+
                 _markChatAsRead();
               }
             }
@@ -1148,14 +1180,14 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               );
             }
           });
-          
+
           _markChatAsRead();
         }
       }
     } catch (e) {
       _showErrorDialog(AppLocalizations.of(context)!.errorForwardingMessage);
     }
-    
+
     focusNode.requestFocus();
   }
 
@@ -1176,8 +1208,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   void _deleteMessage(Message message) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1204,12 +1237,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               });
               Navigator.pop(context);
             },
-            child: Text(
-              AppLocalizations.of(context)!.delete, 
-              style: TextStyle(
-                fontSize: 16 * fontSizeScale,
-                color: MessengerTheme.darkError
-              )),
+            child: Text(AppLocalizations.of(context)!.delete,
+                style: TextStyle(
+                    fontSize: 16 * fontSizeScale,
+                    color: MessengerTheme.darkError)),
           ),
         ],
       ),
@@ -1251,8 +1282,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     if (_searchResults.isEmpty) return;
 
     setState(() {
-      _currentSearchIndex = (_currentSearchIndex + direction) % _searchResults.length;
-      if (_currentSearchIndex < 0) _currentSearchIndex = _searchResults.length - 1;
+      _currentSearchIndex =
+          (_currentSearchIndex + direction) % _searchResults.length;
+      if (_currentSearchIndex < 0)
+        _currentSearchIndex = _searchResults.length - 1;
     });
 
     _scrollToMessage(_searchResults[_currentSearchIndex]);
@@ -1260,7 +1293,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   void _scrollToMessage(Message? message) {
     if (message == null) return;
-    
+
     final index = _messages.indexWhere((msg) => msg.id == message.id);
     if (index != -1 && _scrollController.hasClients) {
       _scrollController.animateTo(
@@ -1268,22 +1301,22 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
-      
+
       setState(() {
         _showPinnedMessages = false;
       });
-      
+
       _highlightMessage(message.id);
     }
   }
 
   void _highlightMessage(int messageId) {
     _highlightTimer?.cancel();
-    
+
     setState(() {
       _highlightedMessageId = messageId;
     });
-    
+
     _highlightTimer = Timer(const Duration(seconds: 3), () {
       if (mounted) {
         setState(() {
@@ -1295,9 +1328,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Widget _buildNotificationStatusIndicator() {
     if (_notificationsEnabled) return const SizedBox.shrink();
-    
+
     final fontSizeScale = Provider.of<FontScaleProvider>(context).fontSizeScale;
-    
+
     return Container(
       margin: EdgeInsets.only(right: 8 * fontSizeScale),
       child: Icon(
@@ -1310,7 +1343,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Widget _buildPinnedMessagesAppBarButton() {
     final fontSizeScale = Provider.of<FontScaleProvider>(context).fontSizeScale;
-    
+
     if (_pinnedMessages.isEmpty || _showSearch) {
       return const SizedBox.shrink();
     }
@@ -1364,14 +1397,14 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Widget _buildPinnedMessagesList() {
     final fontSizeScale = Provider.of<FontScaleProvider>(context).fontSizeScale;
-    
+
     if (!_showPinnedMessages || _pinnedMessages.isEmpty) {
       return const SizedBox.shrink();
     }
 
     final screenWidth = MediaQuery.of(context).size.width;
     double listWidth;
-    
+
     if (kIsWeb && screenWidth > 768) {
       listWidth = screenWidth / 2;
     } else {
@@ -1397,21 +1430,23 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(MessengerTheme.radiusMD),
-            boxShadow: kIsWeb ? [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 10,
-                spreadRadius: 2,
-                offset: const Offset(0, 2),
-              ),
-            ] : [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 6,
-                spreadRadius: 1,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            boxShadow: kIsWeb
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 6,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
           constraints: BoxConstraints(
             maxHeight: 400 * fontSizeScale,
@@ -1432,15 +1467,15 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Widget _buildPinnedMessageItem(Message message, int index) {
     final fontSizeScale = Provider.of<FontScaleProvider>(context).fontSizeScale;
-    
+
     if (message.text == null) {
       return const SizedBox.shrink();
     }
-    
+
     final text = message.text.isNotEmpty ? message.text : '[Медиа-сообщение]';
     final shouldTruncate = _shouldTruncateText(text, fontSizeScale);
     final displayText = shouldTruncate ? _truncateText(text, 2) : text;
-    
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1449,7 +1484,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
             _showPinnedMessages = false;
           });
           _scrollToMessage(message);
-          
+
           _markChatAsRead();
         },
         child: Container(
@@ -1475,7 +1510,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                         fontWeight: FontWeight.w500,
                       ),
                       maxLines: shouldTruncate ? 2 : null,
-                      overflow: shouldTruncate ? TextOverflow.ellipsis : TextOverflow.visible,
+                      overflow: shouldTruncate
+                          ? TextOverflow.ellipsis
+                          : TextOverflow.visible,
                     ),
                   ],
                 ),
@@ -1499,24 +1536,25 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       textDirection: TextDirection.ltr,
       maxLines: 2,
     );
-    
-    final maxWidth = (MediaQuery.of(context).size.width * 0.9) - (40 * fontSizeScale);
+
+    final maxWidth =
+        (MediaQuery.of(context).size.width * 0.9) - (40 * fontSizeScale);
     textPainter.layout(maxWidth: maxWidth);
-    
+
     return textPainter.didExceedMaxLines;
   }
 
   String _truncateText(String text, int maxLines) {
     if (text.isEmpty) return text;
-    
+
     final lines = text.split('\n');
-    
+
     if (lines.length <= maxLines) {
       return text;
     }
-    
+
     final truncatedLines = lines.take(maxLines).toList();
-    
+
     return '${truncatedLines.join('\n')}...';
   }
 
@@ -1524,7 +1562,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final messageDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
-    
+
     if (messageDate == today) {
       return "${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}";
     } else {
@@ -1549,7 +1587,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Widget _buildContactMenu() {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     final isDarkMode = themeProvider.isDarkMode;
 
     final screenWidth = MediaQuery.of(context).size.width;
@@ -1611,32 +1650,28 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                         width: 60 * fontSizeScale,
                         height: 60 * fontSizeScale,
                         decoration: BoxDecoration(
-                          gradient: MessengerTheme.getAvatarGradient(widget.chatId),
+                          gradient:
+                              MessengerTheme.getAvatarGradient(widget.chatId),
                           shape: BoxShape.circle,
                         ),
                         child: _contactInfo['photoUrl'] != null
                             ? ClipRRect(
-                                borderRadius: BorderRadius.circular(30 * fontSizeScale),
+                                borderRadius:
+                                    BorderRadius.circular(30 * fontSizeScale),
                                 child: Image.network(
                                   _contactInfo['photoUrl'],
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) {
-                                    return Icon(
-                                      Icons.person,
-                                      size: 30 * fontSizeScale,
-                                      color: Colors.white
-                                    );
+                                    return Icon(Icons.person,
+                                        size: 30 * fontSizeScale,
+                                        color: Colors.white);
                                   },
                                 ),
                               )
-                            : Icon(
-                                Icons.person,
-                                size: 30 * fontSizeScale,
-                                color: Colors.white
-                              ),
+                            : Icon(Icons.person,
+                                size: 30 * fontSizeScale, color: Colors.white),
                       ),
                       SizedBox(width: 16 * fontSizeScale),
-            
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1656,20 +1691,15 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                           ],
                         ),
                       ),
-            
                       IconButton(
-                        icon: Icon(
-                          Icons.close,
-                          size: 28 * fontSizeScale,
-                          color: Colors.white
-                        ),
+                        icon: Icon(Icons.close,
+                            size: 28 * fontSizeScale, color: Colors.white),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ],
                   ),
                 ),
-
-                if (_showCallHistory) 
+                if (_showCallHistory)
                   _buildCallHistoryContent(setModalState)
                 else
                   _buildMainMenuContent(setModalState),
@@ -1683,7 +1713,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Widget _buildMainMenuContent(Function(void Function()) setModalState) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     final isDarkMode = themeProvider.isDarkMode;
 
     return Expanded(
@@ -1692,11 +1723,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         children: [
           if (_contactInfo['nickname'].isNotEmpty) ...[
             ListTile(
-              leading: Icon(
-                Icons.alternate_email,
-                color: MessengerTheme.lightAccent,
-                size: 24 * fontSizeScale
-              ),
+              leading: Icon(Icons.alternate_email,
+                  color: MessengerTheme.lightAccent, size: 24 * fontSizeScale),
               title: Text(
                 AppLocalizations.of(context)!.nickname,
                 style: TextStyle(fontSize: 16 * fontSizeScale),
@@ -1712,13 +1740,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
             ),
             Divider(color: isDarkMode ? Colors.white24 : Colors.black12),
           ],
-    
           ListTile(
-            leading: Icon(
-              Icons.cake,
-              color: MessengerTheme.lightAccent,
-              size: 24 * fontSizeScale
-            ),
+            leading: Icon(Icons.cake,
+                color: MessengerTheme.lightAccent, size: 24 * fontSizeScale),
             title: Text(
               AppLocalizations.of(context)!.birthday,
               style: TextStyle(fontSize: 16 * fontSizeScale),
@@ -1728,17 +1752,15 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               style: TextStyle(fontSize: 14 * fontSizeScale),
             ),
           ),
-    
           Divider(color: isDarkMode ? Colors.white24 : Colors.black12),
-    
           _buildMenuButton(
             icon: _contactInfo['isContact'] ? Icons.person : Icons.person_add,
             text: _contactInfo['isContact']
                 ? AppLocalizations.of(context)!.editContact
                 : AppLocalizations.of(context)!.addContact,
-            onTap: _contactInfo['isContact'] ? _editContact : _showAddContactModal,
+            onTap:
+                _contactInfo['isContact'] ? _editContact : _showAddContactModal,
           ),
-    
           _buildMenuButton(
             icon: Icons.history,
             text: AppLocalizations.of(context)!.callHistory,
@@ -1749,7 +1771,6 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               _loadCallHistory();
             },
           ),
-    
           _buildMenuButton(
             icon: _isChatBlocked ? Icons.lock_open : Icons.block,
             text: _isChatBlocked
@@ -1759,9 +1780,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               Navigator.pop(context);
               _showBlockDialog();
             },
-            color: _isChatBlocked ? MessengerTheme.darkSuccess : MessengerTheme.darkError,
+            color: _isChatBlocked
+                ? MessengerTheme.darkSuccess
+                : MessengerTheme.darkError,
           ),
-    
           if (_contactInfo['isContact'])
             _buildMenuButton(
               icon: Icons.delete,
@@ -1769,23 +1791,22 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               onTap: _deleteContact,
               color: MessengerTheme.darkError,
             ),
-    
           Divider(color: isDarkMode ? Colors.white24 : Colors.black12),
-    
           if (widget.chatId > 0)
             _buildMenuButton(
               icon: Icons.photo_library,
               text: AppLocalizations.of(context)!.media,
               onTap: _showMediaGallery,
             ),
-    
           StatefulBuilder(
             builder: (context, innerSetState) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildMenuButton(
-                    icon: _notificationsEnabled ? Icons.notifications_active : Icons.notifications_off,
+                    icon: _notificationsEnabled
+                        ? Icons.notifications_active
+                        : Icons.notifications_off,
                     text: _notificationsEnabled
                         ? AppLocalizations.of(context)!.disableNotifications
                         : AppLocalizations.of(context)!.enableNotifications,
@@ -1800,14 +1821,16 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                     },
                     color: _notificationsEnabled ? null : Colors.grey,
                   ),
-            
                   AnimatedSize(
                     duration: const Duration(milliseconds: 300),
                     curve: Curves.easeInOut,
                     alignment: Alignment.topCenter,
                     child: _showMuteOptions && _notificationsEnabled
                         ? Container(
-                            padding: EdgeInsets.only(left: 56 * fontSizeScale, right: 16 * fontSizeScale, bottom: 8 * fontSizeScale),
+                            padding: EdgeInsets.only(
+                                left: 56 * fontSizeScale,
+                                right: 16 * fontSizeScale,
+                                bottom: 8 * fontSizeScale),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -1817,22 +1840,26 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                   setModalState: innerSetState,
                                 ),
                                 _buildMuteOptionItem(
-                                  title: AppLocalizations.of(context)!.sevenDays,
+                                  title:
+                                      AppLocalizations.of(context)!.sevenDays,
                                   value: 10080,
                                   setModalState: innerSetState,
                                 ),
                                 _buildMuteOptionItem(
-                                  title: AppLocalizations.of(context)!.twentyFourHours,
+                                  title: AppLocalizations.of(context)!
+                                      .twentyFourHours,
                                   value: 1440,
                                   setModalState: innerSetState,
                                 ),
                                 _buildMuteOptionItem(
-                                  title: AppLocalizations.of(context)!.twelveHours,
+                                  title:
+                                      AppLocalizations.of(context)!.twelveHours,
                                   value: 720,
                                   setModalState: innerSetState,
                                 ),
                                 _buildMuteOptionItem(
-                                  title: AppLocalizations.of(context)!.threeHours,
+                                  title:
+                                      AppLocalizations.of(context)!.threeHours,
                                   value: 180,
                                   setModalState: innerSetState,
                                 ),
@@ -1845,7 +1872,6 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               );
             },
           ),
-    
           if (widget.chatId > 0)
             _buildMenuButton(
               icon: Icons.delete_outline,
@@ -1858,7 +1884,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildCallHistoryContent(Function(void Function()) setModalState) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
 
     return Expanded(
       child: Column(
@@ -1886,7 +1913,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 const Spacer(),
                 if (_callHistory.isNotEmpty)
                   IconButton(
-                    icon: Icon(Icons.delete, color: MessengerTheme.darkError, size: 24 * fontSizeScale),
+                    icon: Icon(Icons.delete,
+                        color: MessengerTheme.darkError,
+                        size: 24 * fontSizeScale),
                     onPressed: _showClearCallHistoryConfirmation,
                   ),
               ],
@@ -1924,7 +1953,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildCallHistoryItem(CallHistory call, int index) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     final isIncoming = call.callerId != widget.myUserId;
     final isMissed = call.status == 'missed';
     final isOutgoing = !isIncoming && !isMissed;
@@ -1967,9 +1997,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
           SizedBox(width: 8 * fontSizeScale),
           Container(
             padding: EdgeInsets.symmetric(
-              horizontal: 6 * fontSizeScale,
-              vertical: 2 * fontSizeScale
-            ),
+                horizontal: 6 * fontSizeScale, vertical: 2 * fontSizeScale),
             decoration: BoxDecoration(
               color: statusColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(4 * fontSizeScale),
@@ -2075,10 +2103,13 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
             callerId: item['caller_id'],
             recipientId: item['recipient_id'],
             startTime: DateTime.parse(item['created_at']),
-            endTime: item['ended_at'] != null ? DateTime.parse(item['ended_at']) : null,
+            endTime: item['ended_at'] != null
+                ? DateTime.parse(item['ended_at'])
+                : null,
             duration: item['duration'],
             status: item['status'],
-            callType: item['call_type'] ?? (item['is_video_call'] == true ? 'video' : 'audio'),
+            callType: item['call_type'] ??
+                (item['is_video_call'] == true ? 'video' : 'audio'),
           );
         }).toList();
 
@@ -2103,8 +2134,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   void _showClearCallHistoryConfirmation() {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -2160,10 +2192,12 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         });
         _showTooltip(AppLocalizations.of(context)!.callHistoryCleared);
       } else {
-        _showErrorDialog(AppLocalizations.of(context)!.failedToClearCallHistory);
+        _showErrorDialog(
+            AppLocalizations.of(context)!.failedToClearCallHistory);
       }
     } catch (e) {
-      _showErrorDialog('${AppLocalizations.of(context)!.errorClearingCallHistory}: $e');
+      _showErrorDialog(
+          '${AppLocalizations.of(context)!.errorClearingCallHistory}: $e');
     }
   }
 
@@ -2172,9 +2206,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     required int value,
     required Function(void Function()) setModalState,
   }) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     final isSelected = _muteDuration == value && !_notificationsEnabled;
-    
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -2216,25 +2251,27 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     required VoidCallback onTap,
     Color? color,
   }) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: Container(
-          padding: EdgeInsets.symmetric(vertical: 12 * fontSizeScale, horizontal: 16 * fontSizeScale),
+          padding: EdgeInsets.symmetric(
+              vertical: 12 * fontSizeScale, horizontal: 16 * fontSizeScale),
           child: Row(
             children: [
-              Icon(icon, color: color ?? MessengerTheme.lightAccent, size: 24 * fontSizeScale),
+              Icon(icon,
+                  color: color ?? MessengerTheme.lightAccent,
+                  size: 24 * fontSizeScale),
               SizedBox(width: 16 * fontSizeScale),
-              Text(
-                text,
-                style: TextStyle(
-                  fontSize: 16 * fontSizeScale,
-                  color: color ?? Theme.of(context).colorScheme.onSurface,
-                )
-              ),
+              Text(text,
+                  style: TextStyle(
+                    fontSize: 16 * fontSizeScale,
+                    color: color ?? Theme.of(context).colorScheme.onSurface,
+                  )),
             ],
           ),
         ),
@@ -2244,7 +2281,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   void _showAddContactModal() {
     Navigator.pop(context);
-    
+
     showDialog(
       context: context,
       builder: (context) => _buildAddContactDialog(),
@@ -2256,23 +2293,23 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildAddContactDialog() {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDarkMode = themeProvider.isDarkMode;
-    
+
     TextEditingController nameController = TextEditingController(
-      text: _contactInfo['name'].isNotEmpty
-          ? _contactInfo['name']
-          : widget.chatTitle
-    );
+        text: _contactInfo['name'].isNotEmpty
+            ? _contactInfo['name']
+            : widget.chatTitle);
     TextEditingController emailController = TextEditingController();
     TextEditingController noteController = TextEditingController();
-    
+
     bool isLoading = false;
     String? emailError;
-    
+
     nameController.text = widget.chatTitle;
-    
+
     return StatefulBuilder(
       builder: (context, setState) {
         void validateEmail() {
@@ -2283,44 +2320,46 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
             });
             return;
           }
-          
+
           final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
           setState(() {
-            emailError = emailRegex.hasMatch(email) ? null : AppLocalizations.of(context)!.enterValidEmail;
+            emailError = emailRegex.hasMatch(email)
+                ? null
+                : AppLocalizations.of(context)!.enterValidEmail;
           });
         }
-        
+
         Future<void> createContact() async {
           final name = nameController.text.trim();
           final email = emailController.text.trim();
           final note = noteController.text.trim();
-          
+
           if (name.isEmpty) {
             _showTooltip(AppLocalizations.of(context)!.contactNameRequired);
             return;
           }
-          
+
           if (email.isEmpty) {
             _showTooltip(AppLocalizations.of(context)!.contactEmailRequired);
             return;
           }
-          
+
           if (emailError != null) {
             _showTooltip(AppLocalizations.of(context)!.enterValidEmail);
             return;
           }
-          
+
           setState(() {
             isLoading = true;
           });
-          
+
           try {
             final dio = Dio();
             dio.options.headers = {
               'Authorization': 'Bearer ${widget.token}',
               'Content-Type': 'application/json',
             };
-            
+
             final response = await dio.post(
               '${widget.baseUrl}/api/contacts',
               data: {
@@ -2329,10 +2368,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 'note': note.isNotEmpty ? note : null,
               },
             );
-            
+
             if (response.statusCode == 201) {
               await _refreshContactInfo();
-              
+
               Navigator.pop(context, true);
               _showTooltip('Контакт "$name" успешно добавлен');
             } else {
@@ -2349,9 +2388,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
             }
           }
         }
-        
+
         emailController.addListener(validateEmail);
-        
+
         return Dialog(
           backgroundColor: Colors.transparent,
           child: Container(
@@ -2397,13 +2436,13 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                         ),
                       ),
                       IconButton(
-                        icon: Icon(Icons.close, color: Colors.white, size: 22 * fontSizeScale),
+                        icon: Icon(Icons.close,
+                            color: Colors.white, size: 22 * fontSizeScale),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ],
                   ),
                 ),
-                
                 Expanded(
                   child: SingleChildScrollView(
                     padding: EdgeInsets.all(16 * fontSizeScale),
@@ -2428,19 +2467,20 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                           ),
                           decoration: InputDecoration(
                             filled: true,
-                            fillColor: isDarkMode ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                            fillColor: isDarkMode
+                                ? const Color(0xFF2A2A2A)
+                                : const Color(0xFFF5F5F5),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10 * fontSizeScale),
+                              borderRadius:
+                                  BorderRadius.circular(10 * fontSizeScale),
                               borderSide: BorderSide.none,
                             ),
                             contentPadding: EdgeInsets.symmetric(
-                              horizontal: 14 * fontSizeScale,
-                              vertical: 10 * fontSizeScale
-                            ),
+                                horizontal: 14 * fontSizeScale,
+                                vertical: 10 * fontSizeScale),
                           ),
                         ),
                         const SizedBox(height: 16),
-                        
                         Text(
                           'Email контакта',
                           style: TextStyle(
@@ -2459,30 +2499,40 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                           ),
                           decoration: InputDecoration(
                             filled: true,
-                            fillColor: isDarkMode ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                            fillColor: isDarkMode
+                                ? const Color(0xFF2A2A2A)
+                                : const Color(0xFFF5F5F5),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10 * fontSizeScale),
+                              borderRadius:
+                                  BorderRadius.circular(10 * fontSizeScale),
                               borderSide: BorderSide(
-                                color: emailError != null ? Colors.red : Colors.transparent,
+                                color: emailError != null
+                                    ? Colors.red
+                                    : Colors.transparent,
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10 * fontSizeScale),
+                              borderRadius:
+                                  BorderRadius.circular(10 * fontSizeScale),
                               borderSide: BorderSide(
-                                color: emailError != null ? Colors.red : Colors.transparent,
+                                color: emailError != null
+                                    ? Colors.red
+                                    : Colors.transparent,
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10 * fontSizeScale),
+                              borderRadius:
+                                  BorderRadius.circular(10 * fontSizeScale),
                               borderSide: BorderSide(
-                                color: emailError != null ? Colors.red : const Color(0xFFFF9800),
+                                color: emailError != null
+                                    ? Colors.red
+                                    : const Color(0xFFFF9800),
                                 width: 2,
                               ),
                             ),
                             contentPadding: EdgeInsets.symmetric(
-                              horizontal: 14 * fontSizeScale,
-                              vertical: 10 * fontSizeScale
-                            ),
+                                horizontal: 14 * fontSizeScale,
+                                vertical: 10 * fontSizeScale),
                           ),
                         ),
                         if (emailError != null) ...[
@@ -2495,9 +2545,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                             ),
                           ),
                         ],
-                        
                         const SizedBox(height: 16),
-                        
                         Text(
                           'Заметка',
                           style: TextStyle(
@@ -2516,29 +2564,36 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                           ),
                           decoration: InputDecoration(
                             filled: true,
-                            fillColor: isDarkMode ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                            fillColor: isDarkMode
+                                ? const Color(0xFF2A2A2A)
+                                : const Color(0xFFF5F5F5),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10 * fontSizeScale),
+                              borderRadius:
+                                  BorderRadius.circular(10 * fontSizeScale),
                               borderSide: BorderSide.none,
                             ),
                             contentPadding: EdgeInsets.all(12 * fontSizeScale),
                           ),
                         ),
-                        
                         const SizedBox(height: 24),
-                        
                         Row(
                           children: [
                             Expanded(
                               child: OutlinedButton(
-                                onPressed: isLoading ? null : () => Navigator.pop(context),
+                                onPressed: isLoading
+                                    ? null
+                                    : () => Navigator.pop(context),
                                 style: OutlinedButton.styleFrom(
-                                  padding: EdgeInsets.symmetric(vertical: 14 * fontSizeScale),
+                                  padding: EdgeInsets.symmetric(
+                                      vertical: 14 * fontSizeScale),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10 * fontSizeScale),
+                                    borderRadius: BorderRadius.circular(
+                                        10 * fontSizeScale),
                                   ),
                                   side: BorderSide(
-                                    color: isDarkMode ? Colors.white24 : Colors.black12,
+                                    color: isDarkMode
+                                        ? Colors.white24
+                                        : Colors.black12,
                                   ),
                                 ),
                                 child: Text(
@@ -2546,7 +2601,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                   style: TextStyle(
                                     fontSize: 16 * fontSizeScale,
                                     fontWeight: FontWeight.w600,
-                                    color: isDarkMode ? Colors.white : Colors.black87,
+                                    color: isDarkMode
+                                        ? Colors.white
+                                        : Colors.black87,
                                   ),
                                 ),
                               ),
@@ -2556,9 +2613,11 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                               child: ElevatedButton(
                                 onPressed: isLoading ? null : createContact,
                                 style: ElevatedButton.styleFrom(
-                                  padding: EdgeInsets.symmetric(vertical: 14 * fontSizeScale),
+                                  padding: EdgeInsets.symmetric(
+                                      vertical: 14 * fontSizeScale),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10 * fontSizeScale),
+                                    borderRadius: BorderRadius.circular(
+                                        10 * fontSizeScale),
                                   ),
                                   backgroundColor: const Color(0xFFFF9800),
                                 ),
@@ -2568,7 +2627,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                         height: 20 * fontSizeScale,
                                         child: const CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                  Colors.white),
                                         ),
                                       )
                                     : Text(
@@ -2597,18 +2658,18 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Future<void> _addContact() async {
     Navigator.pop(context);
-    
+
     try {
       final dio = Dio();
       dio.options.headers = {
         'Authorization': 'Bearer ${widget.token}',
         'Content-Type': 'application/json',
       };
-      
+
       final checkResponse = await dio.get(
         '${widget.baseUrl}/api/contacts',
       );
-      
+
       if (checkResponse.statusCode == 200) {
         final data = checkResponse.data;
         if (data['success'] == true && data['contacts'] != null) {
@@ -2617,7 +2678,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
             (c) => c['contact_user_id'] == widget.recipientUserId,
             orElse: () => <String, dynamic>{},
           );
-          
+
           if (existingContact.isNotEmpty) {
             setState(() {
               _contactInfo['isContact'] = true;
@@ -2627,7 +2688,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
           }
         }
       }
-      
+
       final response = await dio.post(
         '${widget.baseUrl}/api/contacts',
         data: {
@@ -2636,7 +2697,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
           'note': '',
         },
       );
-      
+
       if (response.statusCode == 200 || response.statusCode == 201) {
         await _refreshContactInfo();
         _showTooltip('Контакт "${widget.chatTitle}" успешно добавлен');
@@ -2650,33 +2711,33 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Future<void> _editContact() async {
     Navigator.pop(context);
-    
+
     try {
       final dio = Dio();
       dio.options.headers = {
         'Authorization': 'Bearer ${widget.token}',
         'Content-Type': 'application/json',
       };
-      
+
       final response = await dio.get(
         '${widget.baseUrl}/api/contacts',
       );
-      
+
       if (response.statusCode == 200) {
         final data = response.data;
         if (data['success'] == true && data['contacts'] != null) {
           final contacts = List<Map<String, dynamic>>.from(data['contacts']);
-          
+
           final contact = contacts.firstWhere(
             (c) => c['contact_user_id'] == widget.recipientUserId,
             orElse: () => <String, dynamic>{},
           );
-          
+
           if (contact.isNotEmpty) {
             final contactId = contact['id'];
             final currentName = contact['contact_name'] ?? widget.chatTitle;
             final currentNote = contact['note'] ?? '';
-            
+
             // Показываем диалог редактирования
             _showEditContactDialog(contactId, currentName, currentNote);
           } else {
@@ -2689,15 +2750,19 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     }
   }
 
-  void _showEditContactDialog(int contactId, String currentName, String currentNote) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+  void _showEditContactDialog(
+      int contactId, String currentName, String currentNote) {
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDarkMode = themeProvider.isDarkMode;
-    
-    TextEditingController nameController = TextEditingController(text: currentName);
-    TextEditingController noteController = TextEditingController(text: currentNote);
+
+    TextEditingController nameController =
+        TextEditingController(text: currentName);
+    TextEditingController noteController =
+        TextEditingController(text: currentNote);
     bool isLoading = false;
-    
+
     showDialog(
       context: context,
       builder: (context) {
@@ -2705,21 +2770,21 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
           builder: (context, setState) {
             Future<void> updateContact() async {
               final name = nameController.text.trim();
-              
+
               if (name.isEmpty) {
                 _showTooltip('Имя контакта обязательно');
                 return;
               }
-              
+
               setState(() => isLoading = true);
-              
+
               try {
                 final dio = Dio();
                 dio.options.headers = {
                   'Authorization': 'Bearer ${widget.token}',
                   'Content-Type': 'application/json',
                 };
-                
+
                 final response = await dio.put(
                   '${widget.baseUrl}/api/contacts/$contactId',
                   data: {
@@ -2727,7 +2792,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                     'note': noteController.text.trim(),
                   },
                 );
-                
+
                 if (response.statusCode == 200) {
                   await _refreshContactInfo();
                   Navigator.pop(context);
@@ -2741,7 +2806,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 setState(() => isLoading = false);
               }
             }
-            
+
             return Dialog(
               backgroundColor: Colors.transparent,
               child: Container(
@@ -2783,13 +2848,13 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                             ),
                           ),
                           IconButton(
-                            icon: Icon(Icons.close, color: Colors.white, size: 22 * fontSizeScale),
+                            icon: Icon(Icons.close,
+                                color: Colors.white, size: 22 * fontSizeScale),
                             onPressed: () => Navigator.pop(context),
                           ),
                         ],
                       ),
                     ),
-                    
                     Padding(
                       padding: EdgeInsets.all(16 * fontSizeScale),
                       child: Column(
@@ -2812,19 +2877,20 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                             ),
                             decoration: InputDecoration(
                               filled: true,
-                              fillColor: isDarkMode ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                              fillColor: isDarkMode
+                                  ? const Color(0xFF2A2A2A)
+                                  : const Color(0xFFF5F5F5),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10 * fontSizeScale),
+                                borderRadius:
+                                    BorderRadius.circular(10 * fontSizeScale),
                                 borderSide: BorderSide.none,
                               ),
                               contentPadding: EdgeInsets.symmetric(
-                                horizontal: 14 * fontSizeScale,
-                                vertical: 10 * fontSizeScale
-                              ),
+                                  horizontal: 14 * fontSizeScale,
+                                  vertical: 10 * fontSizeScale),
                             ),
                           ),
                           const SizedBox(height: 16),
-                          
                           Text(
                             'Заметка',
                             style: TextStyle(
@@ -2843,26 +2909,32 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                             ),
                             decoration: InputDecoration(
                               filled: true,
-                              fillColor: isDarkMode ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                              fillColor: isDarkMode
+                                  ? const Color(0xFF2A2A2A)
+                                  : const Color(0xFFF5F5F5),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10 * fontSizeScale),
+                                borderRadius:
+                                    BorderRadius.circular(10 * fontSizeScale),
                                 borderSide: BorderSide.none,
                               ),
-                              contentPadding: EdgeInsets.all(12 * fontSizeScale),
+                              contentPadding:
+                                  EdgeInsets.all(12 * fontSizeScale),
                             ),
                           ),
-                          
                           const SizedBox(height: 24),
-                          
                           Row(
                             children: [
                               Expanded(
                                 child: OutlinedButton(
-                                  onPressed: isLoading ? null : () => Navigator.pop(context),
+                                  onPressed: isLoading
+                                      ? null
+                                      : () => Navigator.pop(context),
                                   style: OutlinedButton.styleFrom(
-                                    padding: EdgeInsets.symmetric(vertical: 14 * fontSizeScale),
+                                    padding: EdgeInsets.symmetric(
+                                        vertical: 14 * fontSizeScale),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10 * fontSizeScale),
+                                      borderRadius: BorderRadius.circular(
+                                          10 * fontSizeScale),
                                     ),
                                   ),
                                   child: Text(
@@ -2879,9 +2951,11 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                 child: ElevatedButton(
                                   onPressed: isLoading ? null : updateContact,
                                   style: ElevatedButton.styleFrom(
-                                    padding: EdgeInsets.symmetric(vertical: 14 * fontSizeScale),
+                                    padding: EdgeInsets.symmetric(
+                                        vertical: 14 * fontSizeScale),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10 * fontSizeScale),
+                                      borderRadius: BorderRadius.circular(
+                                          10 * fontSizeScale),
                                     ),
                                     backgroundColor: const Color(0xFFFF9800),
                                   ),
@@ -2889,9 +2963,12 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                       ? SizedBox(
                                           width: 20 * fontSizeScale,
                                           height: 20 * fontSizeScale,
-                                          child: const CircularProgressIndicator(
+                                          child:
+                                              const CircularProgressIndicator(
                                             strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                    Colors.white),
                                           ),
                                         )
                                       : Text(
@@ -2923,33 +3000,35 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Future<void> _deleteContact() async {
     Navigator.pop(context);
-    
+
     try {
       final dio = Dio();
       dio.options.headers = {
         'Authorization': 'Bearer ${widget.token}',
         'Content-Type': 'application/json',
       };
-      
+
       final response = await dio.get(
         '${widget.baseUrl}/api/contacts',
       );
-      
+
       if (response.statusCode == 200) {
         final data = response.data;
         if (data['success'] == true && data['contacts'] != null) {
           final contacts = List<Map<String, dynamic>>.from(data['contacts']);
-          
+
           final contact = contacts.firstWhere(
             (c) => c['contact_user_id'] == widget.recipientUserId,
             orElse: () => <String, dynamic>{},
           );
-          
+
           if (contact.isNotEmpty) {
             final contactId = contact['id'];
-            
-            final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-            
+
+            final fontSizeScale =
+                Provider.of<FontScaleProvider>(context, listen: false)
+                    .fontSizeScale;
+
             showDialog(
               context: context,
               builder: (context) => AlertDialog(
@@ -2972,11 +3051,11 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                   TextButton(
                     onPressed: () async {
                       Navigator.pop(context);
-                      
+
                       final deleteResponse = await dio.delete(
                         '${widget.baseUrl}/api/contacts/$contactId',
                       );
-                      
+
                       if (deleteResponse.statusCode == 200) {
                         await _refreshContactInfo();
                         _showTooltip('Контакт "${widget.chatTitle}" удален');
@@ -2987,9 +3066,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                     child: Text(
                       'Удалить',
                       style: TextStyle(
-                        fontSize: 16 * fontSizeScale,
-                        color: MessengerTheme.darkError
-                      ),
+                          fontSize: 16 * fontSizeScale,
+                          color: MessengerTheme.darkError),
                     ),
                   ),
                 ],
@@ -3010,9 +3088,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       _showErrorDialog('Нельзя открыть медиа для нового чата');
       return;
     }
-    
+
     Navigator.pop(context);
-    
+
     showDialog(
       context: context,
       builder: (context) => MediaGalleryModal(
@@ -3023,15 +3101,16 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     );
   }
 
-  void _muteNotifications(int durationMinutes, [Function(void Function())? setModalState]) async {
+  void _muteNotifications(int durationMinutes,
+      [Function(void Function())? setModalState]) async {
     if (!mounted) return;
-    
+
     final updateState = () {
       setState(() {
         _notificationsEnabled = false;
         _muteDuration = durationMinutes;
         _showMuteOptions = false;
-        
+
         if (durationMinutes == 0) {
           _muteUntil = null;
         } else {
@@ -3039,7 +3118,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         }
       });
     };
-    
+
     if (setModalState != null) {
       setModalState(() {
         updateState();
@@ -3047,20 +3126,20 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     } else {
       updateState();
     }
-    
+
     await _updateNotificationSettingsOnServer(false, durationMinutes);
-    
+
     final durationText = _getMuteDurationForTooltip(durationMinutes);
     final message = durationMinutes == 0
         ? 'Уведомления отключены навсегда'
         : 'Уведомления отключены на $durationText';
-    
+
     _showTooltip(message);
   }
 
   void _enableNotifications([Function(void Function())? setModalState]) async {
     if (!mounted) return;
-    
+
     final updateState = () {
       setState(() {
         _notificationsEnabled = true;
@@ -3069,7 +3148,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         _showMuteOptions = false;
       });
     };
-    
+
     if (setModalState != null) {
       setModalState(() {
         updateState();
@@ -3077,15 +3156,16 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     } else {
       updateState();
     }
-    
+
     await _updateNotificationSettingsOnServer(true, null);
-    
+
     _showTooltip('Уведомления включены');
   }
 
   void _clearChatHistory() {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
     Navigator.pop(context);
     showDialog(
       context: context,
@@ -3113,12 +3193,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 _messages.clear();
               });
             },
-            child: Text(
-              'Очистить',
-              style: TextStyle(
-                fontSize: 16 * fontSizeScale,
-                color: MessengerTheme.darkError
-              )),
+            child: Text('Очистить',
+                style: TextStyle(
+                    fontSize: 16 * fontSizeScale,
+                    color: MessengerTheme.darkError)),
           ),
         ],
       ),
@@ -3130,9 +3208,11 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       setState(() => _isChatBlocked = false);
       return;
     }
-    
-    final blockedUsersProvider = Provider.of<BlockedUsersProvider>(context, listen: false);
-    final isBlocked = blockedUsersProvider.isUserBlocked(widget.recipientUserId!);
+
+    final blockedUsersProvider =
+        Provider.of<BlockedUsersProvider>(context, listen: false);
+    final isBlocked =
+        blockedUsersProvider.isUserBlocked(widget.recipientUserId!);
     setState(() => _isChatBlocked = isBlocked);
     _otherParticipantId = widget.recipientUserId;
   }
@@ -3153,17 +3233,17 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         'Authorization': 'Bearer ${widget.token}',
         'Content-Type': 'application/json',
       };
-      
+
       final response = await dio.get(
         '${widget.baseUrl}/api/chats/${widget.chatId}/notification-settings',
       );
-      
+
       if (response.statusCode == 200) {
         final data = response.data;
         setState(() {
           _notificationsEnabled = data['notifications_enabled'] ?? true;
           _muteDuration = data['mute_duration'];
-          
+
           if (data['muted_until'] != null) {
             try {
               _muteUntil = DateTime.parse(data['muted_until']);
@@ -3171,7 +3251,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               _muteUntil = null;
             }
           }
-          
+
           if (_muteUntil != null && _muteUntil!.isBefore(DateTime.now())) {
             _notificationsEnabled = true;
             _muteDuration = null;
@@ -3202,7 +3282,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   void _startNotificationCheckTimer() {
-    _notificationCheckTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+    _notificationCheckTimer =
+        Timer.periodic(const Duration(minutes: 1), (timer) {
       if (_muteUntil != null && _muteUntil!.isBefore(DateTime.now())) {
         if (mounted) {
           setState(() {
@@ -3216,24 +3297,26 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     });
   }
 
-  Future<void> _updateNotificationSettingsOnServer(bool enabled, int? durationMinutes) async {
+  Future<void> _updateNotificationSettingsOnServer(
+      bool enabled, int? durationMinutes) async {
     if (widget.chatId <= 0) return;
-    
+
     try {
       final dio = Dio();
       dio.options.headers = {
         'Authorization': 'Bearer ${widget.token}',
         'Content-Type': 'application/json',
       };
-      
+
       final Map<String, dynamic> data = {
         'notifications_enabled': enabled,
       };
-      
+
       if (!enabled && durationMinutes != null) {
         data['mute_duration'] = durationMinutes;
         if (durationMinutes > 0) {
-          final muteUntil = DateTime.now().add(Duration(minutes: durationMinutes));
+          final muteUntil =
+              DateTime.now().add(Duration(minutes: durationMinutes));
           data['muted_until'] = muteUntil.toIso8601String();
         } else {
           data['muted_until'] = null;
@@ -3242,12 +3325,12 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         data['mute_duration'] = null;
         data['muted_until'] = null;
       }
-      
+
       final response = await dio.put(
         '${widget.baseUrl}/api/chats/${widget.chatId}/notification-settings',
         data: data,
       );
-      
+
       if (response.statusCode != 200 && response.statusCode != 404) {
         print('Error updating notification settings: ${response.statusCode}');
       }
@@ -3262,23 +3345,23 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     if (durationMinutes == 720) return '12 часов';
     if (durationMinutes == 1440) return '24 часа';
     if (durationMinutes == 10080) return '7 дней';
-    
+
     final days = durationMinutes ~/ 1440;
     if (days > 0) {
       return '$days дн';
     }
-    
+
     final hours = durationMinutes ~/ 60;
     if (hours > 0) {
       return '$hours ч';
     }
-    
+
     return '$durationMinutes мин';
   }
 
   void _showTooltip(String message) {
     _tooltipTimer?.cancel();
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -3288,12 +3371,13 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         backgroundColor: Colors.black.withOpacity(0.7),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.fromLTRB(10, kToolbarHeight + MediaQuery.of(context).padding.top + 10, 10, 0),
+        margin: EdgeInsets.fromLTRB(10,
+            kToolbarHeight + MediaQuery.of(context).padding.top + 10, 10, 0),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         elevation: 6,
       ),
     );
-    
+
     _tooltipTimer = Timer(const Duration(seconds: 2), () {
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -3303,18 +3387,18 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Future<void> _markChatAsRead() async {
     if (widget.chatId <= 0 || _hasMarkedAsRead) return;
-    
+
     try {
       final dio = Dio();
       dio.options.headers = {
         'Authorization': 'Bearer ${widget.token}',
         'Content-Type': 'application/json',
       };
-      
+
       final response = await dio.post(
         '${widget.baseUrl}/api/chats/${widget.chatId}/mark-read',
       );
-      
+
       if (response.statusCode == 200) {
         _hasMarkedAsRead = true;
         print('✅ Chat marked as read: ${widget.chatId}');
@@ -3355,17 +3439,20 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   void _scrollListener() {
-    if (_scrollController.offset < _scrollController.position.maxScrollExtent - 300) {
+    if (_scrollController.offset <
+        _scrollController.position.maxScrollExtent - 300) {
       if (!_showScrollDownButton) setState(() => _showScrollDownButton = true);
     } else {
       if (_showScrollDownButton) setState(() => _showScrollDownButton = false);
     }
 
-    if (_scrollController.offset <= _scrollController.position.minScrollExtent + 100) {
+    if (_scrollController.offset <=
+        _scrollController.position.minScrollExtent + 100) {
       _loadMoreMessages();
     }
 
-    if (_scrollController.offset >= _scrollController.position.maxScrollExtent - 100) {
+    if (_scrollController.offset >=
+        _scrollController.position.maxScrollExtent - 100) {
       _markChatAsRead();
     }
   }
@@ -3379,11 +3466,12 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOut,
           );
-          
+
           _markChatAsRead();
         } catch (e) {
           try {
-            _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+            _scrollController
+                .jumpTo(_scrollController.position.maxScrollExtent);
             _markChatAsRead();
           } catch (e) {
             // Игнорируем
@@ -3430,12 +3518,14 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         final List<Message> loadedMessages = messagesData.map((messageJson) {
           String? fileUrl = messageJson['fileUrl'] ?? messageJson['file_url'];
           if (fileUrl != null && !fileUrl.startsWith('http')) {
-            fileUrl = '${widget.baseUrl}${fileUrl.startsWith('/') ? '' : '/'}$fileUrl';
+            fileUrl =
+                '${widget.baseUrl}${fileUrl.startsWith('/') ? '' : '/'}$fileUrl';
           }
 
           DateTime createdAt;
           try {
-            final utcTime = DateTime.parse(messageJson['createdAt'] ?? messageJson['created_at']);
+            final utcTime = DateTime.parse(
+                messageJson['createdAt'] ?? messageJson['created_at']);
             createdAt = utcTime.toLocal();
           } catch (e) {
             createdAt = DateTime.now();
@@ -3460,8 +3550,11 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
             fileUrl: fileUrl,
             typeId: typeId,
             duration: messageJson['duration'],
-            isForwarded: messageJson['isForwarded'] ?? messageJson['is_forwarded'] ?? false,
-            forwardedFrom: messageJson['forwardedFrom'] ?? messageJson['forwarded_from'],
+            isForwarded: messageJson['isForwarded'] ??
+                messageJson['is_forwarded'] ??
+                false,
+            forwardedFrom:
+                messageJson['forwardedFrom'] ?? messageJson['forwarded_from'],
           );
         }).toList();
 
@@ -3473,10 +3566,11 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
             _messages.addAll(loadedMessages);
           }
           _isLoading = false;
-          
+
           final pagination = data['pagination'];
           if (pagination != null) {
-            _hasMoreMessages = pagination['hasMore'] ?? (loadedMessages.length == 20);
+            _hasMoreMessages =
+                pagination['hasMore'] ?? (loadedMessages.length == 20);
           } else {
             _hasMoreMessages = loadedMessages.length == 20;
           }
@@ -3493,7 +3587,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       setState(() {
         _isLoading = false;
       });
-      
+
       if (e is DioException) {
         if (e.response?.statusCode == 404) {
           _showErrorDialog('Чат не найден или еще не создан');
@@ -3508,14 +3602,21 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   int _getTypeIdFromType(String type) {
     switch (type) {
-      case 'text': return 1;
-      case 'image': return 2;
-      case 'video': return 3;
-      case 'audio': 
-      case 'voice': return 4;
-      case 'file': return 5;
-      case 'gif': return 6;
-      default: return 1;
+      case 'text':
+        return 1;
+      case 'image':
+        return 2;
+      case 'video':
+        return 3;
+      case 'audio':
+      case 'voice':
+        return 4;
+      case 'file':
+        return 5;
+      case 'gif':
+        return 6;
+      default:
+        return 1;
     }
   }
 
@@ -3534,28 +3635,29 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       _showErrorDialog('Чат заблокирован, нельзя отправить сообщение');
       return;
     }
-    
+
     if (!_audioInitialized) {
       _showErrorDialog('Аудио сервис не инициализирован');
       return;
     }
-    
+
     if (!_microphonePermissionGranted) {
       _showErrorDialog('Нет разрешения на использование микрофона');
       return;
     }
-    
+
     try {
       await _voiceService.startRecording();
     } catch (e) {
       String errorMessage = 'Не удалось начать запись';
-      
+
       if (kIsWeb) {
         errorMessage += '. Для веба требуется HTTPS и разрешение на микрофон';
       } else {
-        errorMessage += '. Проверьте разрешения на микрофон в настройках приложения';
+        errorMessage +=
+            '. Проверьте разрешения на микрофон в настройках приложения';
       }
-      
+
       _showErrorDialog(errorMessage);
     }
   }
@@ -3581,7 +3683,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       _showErrorDialog('Чат заблокирован, нельзя отправить сообщение');
       return;
     }
-    
+
     final hasVoiceMessage = await _voiceService.hasVoiceMessage;
     if (!hasVoiceMessage) {
       _showErrorDialog('Сначала запишите голосовое сообщение');
@@ -3630,16 +3732,15 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       });
 
       focusNode.requestFocus();
-      
+
       _markChatAsRead();
-      
     } catch (e) {
       _showErrorDialog('Ошибка при отправке голосового сообщения');
-      
+
       setState(() {
         _messages.removeWhere((msg) => msg.id == tempMsg.id);
       });
-      
+
       focusNode.requestFocus();
     }
   }
@@ -3649,7 +3750,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       _showErrorDialog('Аудио сервис не инициализирован');
       return;
     }
-    
+
     try {
       if (_isPlaying && _playingMessageId == message.id) {
         await _voiceService.pausePlaying();
@@ -3658,7 +3759,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       }
     } catch (e) {
       _showErrorDialog('Не удалось воспроизвести голосовое сообщение');
-      
+
       _voiceService.onPlayingStateChanged?.call(false);
       _voiceService.onPlayingMessageIdChanged?.call(null);
     }
@@ -3673,9 +3774,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         _attachedFiles.add(file);
         _hasAttachments = true;
       });
-      
+
       focusNode.requestFocus();
-      
     } catch (e) {
       _showErrorDialog('Ошибка при выборе файла');
     }
@@ -3683,8 +3783,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Future<void> _attachFile() async {
     try {
-      final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-      
+      final fontSizeScale =
+          Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -3711,7 +3812,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 },
               ),
               ListTile(
-                leading: Icon(Icons.attach_file, color: MessengerTheme.lightAccent),
+                leading:
+                    Icon(Icons.attach_file, color: MessengerTheme.lightAccent),
                 title: const Text('Любой файл'),
                 onTap: () async {
                   Navigator.pop(context);
@@ -3735,7 +3837,6 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
           ],
         ),
       );
-      
     } catch (e) {
       _showErrorDialog('Ошибка при выборе файла');
     }
@@ -3753,9 +3854,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       _showErrorDialog('Чат заблокирован, нельзя отправить сообщение');
       return;
     }
-    
+
     final text = _controller.text.trim();
-    
+
     final hasVoiceMessage = await _voiceService.hasVoiceMessage;
     if (hasVoiceMessage) {
       await _sendVoiceMessage();
@@ -3804,7 +3905,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         'chat_id': widget.chatId,
         'type_id': 1,
       };
-      
+
       if (widget.chatId == 0 && widget.recipientUserId != null) {
         data['user_id'] = widget.recipientUserId!;
       }
@@ -3827,25 +3928,27 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               id: newMessageId ?? tempMsg.id,
               userId: widget.myUserId,
               text: text,
-              createdAt: DateTime.parse(responseData['created_at'] ?? DateTime.now().toIso8601String()),
+              createdAt: DateTime.parse(responseData['created_at'] ??
+                  DateTime.now().toIso8601String()),
               typeId: 1,
             );
           }
         });
-        
+
         _markChatAsRead();
       } else {
         setState(() {
           _messages.removeWhere((msg) => msg.id == tempMsg.id);
         });
-        
-        _showErrorDialog('Ошибка ${response.statusCode}: ${response.data['error'] ?? 'Неизвестная ошибка'}');
+
+        _showErrorDialog(
+            'Ошибка ${response.statusCode}: ${response.data['error'] ?? 'Неизвестная ошибка'}');
       }
     } catch (e) {
       setState(() {
         _messages.removeWhere((msg) => msg.id == tempMsg.id);
       });
-      
+
       if (e is DioException) {
         _showErrorDialog('Ошибка сети: ${e.message}');
       } else {
@@ -3858,7 +3961,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Future<void> _sendMessageWithFiles(String text) async {
     if (_attachedFiles.isEmpty) return;
-    
+
     setState(() {
       _isSendingFiles = true;
     });
@@ -3866,9 +3969,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     try {
       for (var file in _attachedFiles) {
         final tempId = const Uuid().v4().hashCode;
-        
+
         final tempTypeId = _mediaService.getTypeIdFromFilename(file.name);
-        
+
         final tempMsg = Message(
           id: tempId,
           userId: widget.myUserId,
@@ -3881,12 +3984,12 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         setState(() {
           _messages.add(tempMsg);
         });
-        
+
         _scrollToBottom();
         await Future.delayed(const Duration(milliseconds: 100));
 
         final formData = FormData();
-        
+
         if (kIsWeb) {
           final bytes = await file.readAsBytes();
           formData.files.add(MapEntry(
@@ -3911,7 +4014,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         };
 
         print('📤 Отправка файла: ${file.name}');
-        
+
         final response = await dio.post(
           '${widget.baseUrl}/api/upload',
           data: formData,
@@ -3922,21 +4025,22 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
         if (response.statusCode == 200 && mounted) {
           final data = response.data;
-          
+
           setState(() {
             _messages.removeWhere((msg) => msg.id == tempId);
-            
+
             DateTime createdAt;
             try {
-              createdAt = DateTime.parse(data['created_at'] ?? data['createdAt']);
+              createdAt =
+                  DateTime.parse(data['created_at'] ?? data['createdAt']);
             } catch (e) {
               createdAt = DateTime.now();
             }
-            
+
             final serverTypeId = data['type_id'] ?? data['typeId'];
-            
+
             print('📊 Тип файла от сервера: $serverTypeId');
-            
+
             final newMessage = Message(
               id: data['message_id'] ?? data['id'],
               userId: widget.myUserId,
@@ -3945,19 +4049,18 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               fileUrl: data['file_url'] ?? data['fileUrl'],
               typeId: serverTypeId is int ? serverTypeId : 5,
             );
-            
+
             _messages.add(newMessage);
           });
-          
+
           _scrollToBottom();
           await Future.delayed(const Duration(milliseconds: 100));
         } else {
           throw Exception('Ошибка загрузки файла: ${response.statusCode}');
         }
       }
-      
+
       _markChatAsRead();
-      
     } catch (e) {
       print('❌ Ошибка отправки файла: $e');
       _showErrorDialog('Ошибка при отправке файлов: $e');
@@ -3976,7 +4079,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       _hasAttachments = false;
       _showEmojiPicker = false;
     });
-    
+
     focusNode.requestFocus();
   }
 
@@ -4066,19 +4169,21 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     _chewieController = null;
     _videoPlayerController?.dispose();
     _videoPlayerController = null;
-    
+
     focusNode.requestFocus();
   }
 
   void _showVideoErrorDialog(String videoUrl) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.error, color: MessengerTheme.darkError, size: 24 * fontSizeScale),
+            Icon(Icons.error,
+                color: MessengerTheme.darkError, size: 24 * fontSizeScale),
             SizedBox(width: 8 * fontSizeScale),
             Text(
               'Ошибка',
@@ -4165,8 +4270,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   void _showErrorDialog(String message) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -4184,13 +4290,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               Navigator.pop(context);
               focusNode.requestFocus();
             },
-            child: Text(
-              'OK',
-              style: TextStyle(
-                fontSize: 16 * fontSizeScale,
-                color: MessengerTheme.lightAccent
-              )
-            ),
+            child: Text('OK',
+                style: TextStyle(
+                    fontSize: 16 * fontSizeScale,
+                    color: MessengerTheme.lightAccent)),
           ),
         ],
       ),
@@ -4204,15 +4307,19 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildForwardedMessageHeader(Message msg) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
-    if (!msg.isForwarded || msg.forwardedFrom == null || msg.forwardedFrom!.isEmpty) {
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
+    if (!msg.isForwarded ||
+        msg.forwardedFrom == null ||
+        msg.forwardedFrom!.isEmpty) {
       return const SizedBox.shrink();
     }
-    
+
     return Container(
       margin: EdgeInsets.only(bottom: 4 * fontSizeScale),
-      padding: EdgeInsets.symmetric(horizontal: 8 * fontSizeScale, vertical: 4 * fontSizeScale),
+      padding: EdgeInsets.symmetric(
+          horizontal: 8 * fontSizeScale, vertical: 4 * fontSizeScale),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface.withOpacity(0.3),
         borderRadius: BorderRadius.circular(6 * fontSizeScale),
@@ -4220,8 +4327,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.reply, size: 12 * fontSizeScale,
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+          Icon(Icons.reply,
+              size: 12 * fontSizeScale,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
           SizedBox(width: 4 * fontSizeScale),
           Text(
             'От: ${msg.forwardedFrom!}',
@@ -4237,16 +4345,18 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildBlockedWarning() {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
     if (!_isChatBlocked) return const SizedBox.shrink();
-    
+
     return Container(
       padding: EdgeInsets.all(12 * fontSizeScale),
       color: MessengerTheme.darkError.withOpacity(0.05),
       child: Row(
         children: [
-          Icon(Icons.block, color: MessengerTheme.darkError, size: 24 * fontSizeScale),
+          Icon(Icons.block,
+              color: MessengerTheme.darkError, size: 24 * fontSizeScale),
           SizedBox(width: 8 * fontSizeScale),
           Expanded(
             child: Text(
@@ -4263,14 +4373,16 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   void _showBlockDialog() {
-    final blockedUsersProvider = Provider.of<BlockedUsersProvider>(context, listen: false);
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
+    final blockedUsersProvider =
+        Provider.of<BlockedUsersProvider>(context, listen: false);
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
     if (_otherParticipantId == null) {
       _showErrorDialog('Нельзя заблокировать этот чат');
       return;
     }
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -4311,21 +4423,22 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                   _isChatBlocked = false;
                 });
               } else {
-                blockedUsersProvider.blockUser(_otherParticipantId!, widget.chatTitle);
+                blockedUsersProvider.blockUser(
+                    _otherParticipantId!, widget.chatTitle);
                 setState(() {
                   _isChatBlocked = true;
                 });
               }
-              
+
               Navigator.pop(context);
             },
             child: Text(
-              _isChatBlocked
-                  ? 'Разблокировать'
-                  : 'Заблокировать',
+              _isChatBlocked ? 'Разблокировать' : 'Заблокировать',
               style: TextStyle(
                 fontSize: 16 * fontSizeScale,
-                color: _isChatBlocked ? MessengerTheme.darkSuccess : MessengerTheme.darkError,
+                color: _isChatBlocked
+                    ? MessengerTheme.darkSuccess
+                    : MessengerTheme.darkError,
               ),
             ),
           ),
@@ -4335,10 +4448,11 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildVoiceMessage(Message msg, bool isMe) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     final isPlaying = _isPlaying && _playingMessageId == msg.id;
     final duration = msg.duration ?? 0;
-    
+
     return Container(
       constraints: BoxConstraints(maxWidth: 280 * fontSizeScale),
       padding: EdgeInsets.all(12 * fontSizeScale),
@@ -4364,26 +4478,27 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 onPressed: () => _playVoiceMessage(msg),
                 padding: EdgeInsets.zero,
                 constraints: BoxConstraints(
-                  minWidth: 40 * fontSizeScale,
-                  minHeight: 40 * fontSizeScale
-                ),
+                    minWidth: 40 * fontSizeScale,
+                    minHeight: 40 * fontSizeScale),
               ),
               SizedBox(width: 8 * fontSizeScale),
-              
               _buildAudioVisualization(msg, isMe, isPlaying),
               SizedBox(width: 12 * fontSizeScale),
-              
               Text(
                 _formatShortDuration(duration),
                 style: TextStyle(
                   fontSize: 14 * fontSizeScale,
-                  color: isMe ? Colors.white70 : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                  color: isMe
+                      ? Colors.white70
+                      : Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.7),
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ],
           ),
-          
           if (isPlaying && duration > 0) ...[
             SizedBox(height: 8 * fontSizeScale),
             _buildAudioProgressBar(msg),
@@ -4394,8 +4509,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildAudioProgressBar(Message msg) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
     return StreamBuilder<Duration>(
       stream: _voiceService.positionStream,
       builder: (context, positionSnapshot) {
@@ -4404,7 +4520,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         final progress = duration.inSeconds > 0
             ? position.inSeconds / duration.inSeconds
             : 0.0;
-        
+
         return Container(
           height: 4 * fontSizeScale,
           width: 200 * fontSizeScale,
@@ -4420,7 +4536,6 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                   borderRadius: BorderRadius.circular(2 * fontSizeScale),
                 ),
               ),
-              
               FractionallySizedBox(
                 widthFactor: progress.clamp(0.0, 1.0).toDouble(),
                 child: Container(
@@ -4430,16 +4545,21 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                   ),
                 ),
               ),
-              
               if (position.inSeconds > 0)
                 Positioned(
-                  left: (progress.clamp(0.0, 1.0).toDouble() * 200 * fontSizeScale) - 15 * fontSizeScale,
+                  left: (progress.clamp(0.0, 1.0).toDouble() *
+                          200 *
+                          fontSizeScale) -
+                      15 * fontSizeScale,
                   top: -20 * fontSizeScale,
                   child: Text(
                     _formatShortDuration(position.inSeconds),
                     style: TextStyle(
                       fontSize: 10 * fontSizeScale,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.7),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -4452,8 +4572,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildAudioVisualization(Message msg, bool isMe, bool isPlaying) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
     return Container(
       height: 30 * fontSizeScale,
       width: 80 * fontSizeScale,
@@ -4463,9 +4584,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         children: List.generate(5, (index) {
           final baseHeight = (index + 1) * 3.0 * fontSizeScale;
           final animatedHeight = isPlaying
-              ? baseHeight + (DateTime.now().millisecond % 10) * fontSizeScale / 10
+              ? baseHeight +
+                  (DateTime.now().millisecond % 10) * fontSizeScale / 10
               : baseHeight;
-              
+
           return AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             width: 6 * fontSizeScale,
@@ -4481,16 +4603,15 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildImageMessage(Message msg, bool isMe) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     final imageUrl = msg.fileUrl!;
 
     return GestureDetector(
       onTap: () => _showImageDialog(context, imageUrl),
       child: Container(
         constraints: BoxConstraints(
-          maxWidth: 250 * fontSizeScale,
-          maxHeight: 250 * fontSizeScale
-        ),
+            maxWidth: 250 * fontSizeScale, maxHeight: 250 * fontSizeScale),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12 * fontSizeScale),
           color: Theme.of(context).colorScheme.surface,
@@ -4528,18 +4649,22 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.broken_image,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                      size: 50 * fontSizeScale
-                    ),
+                    Icon(Icons.broken_image,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.5),
+                        size: 50 * fontSizeScale),
                     const SizedBox(height: 8),
                     Text(
                       'Не удалось загрузить изображение',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 12 * fontSizeScale,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.5),
                       ),
                     ),
                   ],
@@ -4553,7 +4678,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildVideoMessage(Message msg, bool isMe) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     final videoUrl = msg.fileUrl!;
 
     return GestureDetector(
@@ -4575,7 +4701,6 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 color: Colors.black.withOpacity(0.3),
               ),
             ),
-            
             Center(
               child: Container(
                 width: 60 * fontSizeScale,
@@ -4592,22 +4717,20 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 ),
               ),
             ),
-            
             Positioned(
               top: 8 * fontSizeScale,
               right: 8 * fontSizeScale,
               child: Container(
                 padding: EdgeInsets.symmetric(
-                  horizontal: 6 * fontSizeScale,
-                  vertical: 2 * fontSizeScale
-                ),
+                    horizontal: 6 * fontSizeScale, vertical: 2 * fontSizeScale),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.7),
                   borderRadius: BorderRadius.circular(4 * fontSizeScale),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.videocam, color: Colors.white, size: 12 * fontSizeScale),
+                    Icon(Icons.videocam,
+                        color: Colors.white, size: 12 * fontSizeScale),
                     const SizedBox(width: 2),
                     const Text(
                       'VIDEO',
@@ -4628,7 +4751,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildFileMessage(Message msg, bool isMe) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
     final fileUrl = msg.fileUrl!;
 
     return GestureDetector(
@@ -4639,7 +4763,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         width: 250 * fontSizeScale,
         padding: EdgeInsets.all(12 * fontSizeScale),
         decoration: BoxDecoration(
-          color: isMe ? MessengerTheme.lightAccent : Theme.of(context).colorScheme.surface,
+          color: isMe
+              ? MessengerTheme.lightAccent
+              : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(12 * fontSizeScale),
           border: Border.all(
             color: isMe ? Colors.white24 : Theme.of(context).dividerColor,
@@ -4653,12 +4779,16 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               width: 40 * fontSizeScale,
               height: 40 * fontSizeScale,
               decoration: BoxDecoration(
-                color: isMe ? Colors.white : MessengerTheme.lightAccent.withOpacity(0.1),
+                color: isMe
+                    ? Colors.white
+                    : MessengerTheme.lightAccent.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8 * fontSizeScale),
               ),
               child: Icon(
                 _getFileIcon(msg.fileUrl ?? ''),
-                color: isMe ? MessengerTheme.lightAccent : MessengerTheme.lightAccent,
+                color: isMe
+                    ? MessengerTheme.lightAccent
+                    : MessengerTheme.lightAccent,
                 size: 24 * fontSizeScale,
               ),
             ),
@@ -4671,7 +4801,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                     _getFileName(msg.fileUrl ?? ''),
                     style: TextStyle(
                       fontSize: 14 * fontSizeScale,
-                      color: isMe ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                      color: isMe
+                          ? Colors.white
+                          : Theme.of(context).colorScheme.onSurface,
                       fontWeight: FontWeight.w500,
                     ),
                     maxLines: 1,
@@ -4682,7 +4814,12 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                     'Нажмите для скачивания',
                     style: TextStyle(
                       fontSize: 12 * fontSizeScale,
-                      color: isMe ? Colors.white70 : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                      color: isMe
+                          ? Colors.white70
+                          : Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.6),
                     ),
                   ),
                 ],
@@ -4701,15 +4838,17 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   IconData _getFileIcon(String fileUrl) {
     final extension = fileUrl.split('.').last.toLowerCase();
-    
+
     if (['pdf'].contains(extension)) return Icons.picture_as_pdf;
     if (['doc', 'docx'].contains(extension)) return Icons.description;
     if (['xls', 'xlsx'].contains(extension)) return Icons.table_chart;
     if (['ppt', 'pptx'].contains(extension)) return Icons.slideshow;
-    if (['zip', 'rar', '7z', 'tar', 'gz'].contains(extension)) return Icons.archive;
+    if (['zip', 'rar', '7z', 'tar', 'gz'].contains(extension))
+      return Icons.archive;
     if (['txt', 'md', 'rtf'].contains(extension)) return Icons.text_snippet;
-    if (['py', 'js', 'java', 'cpp', 'c', 'h', 'html', 'css', 'json'].contains(extension)) return Icons.code;
-    
+    if (['py', 'js', 'java', 'cpp', 'c', 'h', 'html', 'css', 'json']
+        .contains(extension)) return Icons.code;
+
     return Icons.insert_drive_file;
   }
 
@@ -4724,8 +4863,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   void _showFileOptions(String fileUrl, String fileName) {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -4787,8 +4927,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildRecordingControls() {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    final isRecording = _voiceService.recordingState == RecordingState.recording;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final isRecording =
+        _voiceService.recordingState == RecordingState.recording;
     final isStopped = _voiceService.recordingState == RecordingState.stopped;
     final recordingSeconds = _voiceService.recordingSeconds;
 
@@ -4798,9 +4940,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         children: [
           Container(
             padding: EdgeInsets.symmetric(
-              horizontal: 16 * fontSizeScale,
-              vertical: 8 * fontSizeScale
-            ),
+                horizontal: 16 * fontSizeScale, vertical: 8 * fontSizeScale),
             decoration: BoxDecoration(
               color: MessengerTheme.darkError.withOpacity(0.1),
               borderRadius: BorderRadius.circular(16 * fontSizeScale),
@@ -4808,7 +4948,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.fiber_manual_record, color: MessengerTheme.darkError, size: 16 * fontSizeScale),
+                Icon(Icons.fiber_manual_record,
+                    color: MessengerTheme.darkError, size: 16 * fontSizeScale),
                 SizedBox(width: 8 * fontSizeScale),
                 Text(
                   _formatShortDuration(recordingSeconds),
@@ -4816,7 +4957,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                     fontSize: 14 * fontSizeScale,
                     color: MessengerTheme.darkError,
                     fontWeight: FontWeight.bold,
-                ),
+                  ),
                 ),
               ],
             ),
@@ -4849,15 +4990,17 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildRightButtons() {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    final isRecording = _voiceService.recordingState == RecordingState.recording;
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+    final isRecording =
+        _voiceService.recordingState == RecordingState.recording;
     final isStopped = _voiceService.recordingState == RecordingState.stopped;
-    
+
     return FutureBuilder<bool>(
       future: _isSendButtonActive,
       builder: (context, snapshot) {
         final isActive = snapshot.data ?? false;
-        
+
         return Row(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.end,
@@ -4874,50 +5017,57 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                   ),
                 ),
               ),
-            
             if (isRecording || isStopped)
               IconButton(
-                icon: Icon(
-                  Icons.delete,
-                  color: MessengerTheme.darkError,
-                  size: 28 * fontSizeScale
-                ),
+                icon: Icon(Icons.delete,
+                    color: MessengerTheme.darkError, size: 28 * fontSizeScale),
                 onPressed: () async {
                   await _deleteRecording();
                   focusNode.requestFocus();
                 },
               ),
-            
             SizedBox(width: (isRecording || isStopped) ? 4 * fontSizeScale : 0),
-            
             if (!isRecording && !isStopped)
               IconButton(
                 icon: Icon(
                   Icons.mic,
-                  color: _audioAvailable && _audioInitialized && _microphonePermissionGranted
+                  color: _audioAvailable &&
+                          _audioInitialized &&
+                          _microphonePermissionGranted
                       ? MessengerTheme.lightAccent
-                      : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                      : Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.5),
                   size: 28 * fontSizeScale,
                 ),
-                onPressed: _audioAvailable && _audioInitialized && _microphonePermissionGranted
+                onPressed: _audioAvailable &&
+                        _audioInitialized &&
+                        _microphonePermissionGranted
                     ? _startRecording
                     : null,
               ),
-            
             SizedBox(width: 4 * fontSizeScale),
-            
             MouseRegion(
-              cursor: isActive ? SystemMouseCursors.click : SystemMouseCursors.basic,
+              cursor: isActive
+                  ? SystemMouseCursors.click
+                  : SystemMouseCursors.basic,
               child: IconButton(
                 icon: Icon(
                   Icons.send,
-                  color: isActive && !_isSendingFiles ? MessengerTheme.lightAccent
-                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                  color: isActive && !_isSendingFiles
+                      ? MessengerTheme.lightAccent
+                      : Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.4),
                   size: 28 * fontSizeScale,
                 ),
-                onPressed: isActive && !_isSendingFiles ? () async {
-                  await _sendMessage();
-                } : null,
+                onPressed: isActive && !_isSendingFiles
+                    ? () async {
+                        await _sendMessage();
+                      }
+                    : null,
               ),
             ),
           ],
@@ -4927,8 +5077,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildAttachedFiles() {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
     if (!_hasAttachments) return const SizedBox.shrink();
 
     return Container(
@@ -4940,9 +5091,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
           Text(
             'Прикрепленные файлы',
             style: TextStyle(
-              fontSize: 12 * fontSizeScale,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)
-            ),
+                fontSize: 12 * fontSizeScale,
+                color:
+                    Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
           ),
           const SizedBox(height: 4),
           Wrap(
@@ -4954,8 +5105,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               return Chip(
                 label: Text(
                   fileName.length > 15
-                    ? '${fileName.substring(0, 15)}...'
-                    : fileName,
+                      ? '${fileName.substring(0, 15)}...'
+                      : fileName,
                   style: TextStyle(fontSize: 12 * fontSizeScale),
                 ),
                 deleteIcon: Icon(Icons.close, size: 16 * fontSizeScale),
@@ -4969,8 +5120,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildEmojiPicker() {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
     return Container(
       height: 250 * fontSizeScale,
       color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
@@ -4982,7 +5134,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               controller: _tabController,
               isScrollable: true,
               labelColor: MessengerTheme.lightAccent,
-              unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+              unselectedLabelColor:
+                  Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
               indicatorColor: MessengerTheme.lightAccent,
               tabs: EmojiData.categories.keys.map((emoji) {
                 return Tab(text: emoji);
@@ -5007,7 +5160,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                       onTap: () => _addEmoji(emojis[index]),
                       child: Container(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8 * fontSizeScale),
+                          borderRadius:
+                              BorderRadius.circular(8 * fontSizeScale),
                           color: Colors.transparent,
                         ),
                         child: Center(
@@ -5029,9 +5183,11 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildVideoModal() {
-    final fontSizeScale = Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
-    
-    if (!_showVideoModal || _chewieController == null) return const SizedBox.shrink();
+    final fontSizeScale =
+        Provider.of<FontScaleProvider>(context, listen: false).fontSizeScale;
+
+    if (!_showVideoModal || _chewieController == null)
+      return const SizedBox.shrink();
 
     return Stack(
       children: [
@@ -5126,7 +5282,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                     children: [
                       if (_searchResults.isNotEmpty) ...[
                         IconButton(
-                          icon: Icon(Icons.arrow_upward, size: 20 * fontSizeScale),
+                          icon: Icon(Icons.arrow_upward,
+                              size: 20 * fontSizeScale),
                           color: Colors.white,
                           onPressed: _currentSearchIndex > 0
                               ? () => _navigateToSearchResult(-1)
@@ -5140,11 +5297,13 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                           ),
                         ),
                         IconButton(
-                          icon: Icon(Icons.arrow_downward, size: 20 * fontSizeScale),
+                          icon: Icon(Icons.arrow_downward,
+                              size: 20 * fontSizeScale),
                           color: Colors.white,
-                          onPressed: _currentSearchIndex < _searchResults.length - 1
-                              ? () => _navigateToSearchResult(1)
-                              : null,
+                          onPressed:
+                              _currentSearchIndex < _searchResults.length - 1
+                                  ? () => _navigateToSearchResult(1)
+                                  : null,
                         ),
                       ],
                     ],
@@ -5169,9 +5328,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                       ),
                     ),
                     Text(
-                      _isChatBlocked
-                          ? 'Заблокирован'
-                          : 'В сети',
+                      _isChatBlocked ? 'Заблокирован' : 'В сети',
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 12 * fontSizeScale,
@@ -5286,11 +5443,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 );
               },
             ),
-          
           _buildNotificationStatusIndicator(),
-          
           _buildPinnedMessagesAppBarButton(),
-          
           IconButton(
             icon: Icon(
               _showSearch ? Icons.close : Icons.search,
@@ -5320,12 +5474,14 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                             ListView.builder(
                               key: ValueKey(_messages.length),
                               controller: _scrollController,
-                              itemCount: _messages.length + (_hasMoreMessages ? 1 : 0),
+                              itemCount:
+                                  _messages.length + (_hasMoreMessages ? 1 : 0),
                               itemBuilder: (context, index) {
                                 if (index == 0 && _hasMoreMessages) {
                                   return Center(
                                     child: Padding(
-                                      padding: EdgeInsets.all(8.0 * fontSizeScale),
+                                      padding:
+                                          EdgeInsets.all(8.0 * fontSizeScale),
                                       child: CircularProgressIndicator(
                                         color: MessengerTheme.lightAccent,
                                       ),
@@ -5333,35 +5489,44 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                   );
                                 }
 
-                                final msgIndex = _hasMoreMessages ? index - 1 : index;
+                                final msgIndex =
+                                    _hasMoreMessages ? index - 1 : index;
                                 final msg = _messages[msgIndex];
                                 final isMe = msg.userId == widget.myUserId;
                                 final timeString =
                                     "${msg.createdAt.hour.toString().padLeft(2, '0')}:${msg.createdAt.minute.toString().padLeft(2, '0')}";
 
-                                final isSearchResult = _searchResults.contains(msg);
-                                final isCurrentSearchResult = _searchResults.isNotEmpty &&
+                                final isSearchResult =
+                                    _searchResults.contains(msg);
+                                final isCurrentSearchResult = _searchResults
+                                        .isNotEmpty &&
                                     _currentSearchIndex >= 0 &&
                                     _searchResults[_currentSearchIndex] == msg;
 
-                                final isHighlighted = msg.id == _highlightedMessageId;
+                                final isHighlighted =
+                                    msg.id == _highlightedMessageId;
 
                                 return GestureDetector(
                                   key: Key('message_${msg.id}'),
                                   onTapDown: (details) {
                                     if (!kIsWeb) {
-                                      _showMessageContextMenu(msg, details, context);
+                                      _showMessageContextMenu(
+                                          msg, details, context);
                                     }
                                   },
                                   onSecondaryTapDown: (details) {
-                                    _showMessageContextMenu(msg, details, context);
+                                    _showMessageContextMenu(
+                                        msg, details, context);
                                   },
                                   onLongPress: () {
                                     if (!kIsWeb) {
-                                      final renderBox = context.findRenderObject() as RenderBox?;
+                                      final renderBox = context
+                                          .findRenderObject() as RenderBox?;
                                       if (renderBox != null) {
-                                        final offset = renderBox.localToGlobal(renderBox.size.center(Offset.zero));
-                                        _showMessageContextMenuAtPosition(msg, offset);
+                                        final offset = renderBox.localToGlobal(
+                                            renderBox.size.center(Offset.zero));
+                                        _showMessageContextMenuAtPosition(
+                                            msg, offset);
                                       }
                                     }
                                   },
@@ -5374,31 +5539,52 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                               : Colors.transparent,
                                     ),
                                     child: Align(
-                                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                                      alignment: isMe
+                                          ? Alignment.centerRight
+                                          : Alignment.centerLeft,
                                       child: Container(
                                         margin: EdgeInsets.symmetric(
-                                          horizontal: 10 * fontSizeScale,
-                                          vertical: 6 * fontSizeScale
-                                        ),
-                                        padding: EdgeInsets.all(10 * fontSizeScale),
+                                            horizontal: 10 * fontSizeScale,
+                                            vertical: 6 * fontSizeScale),
+                                        padding:
+                                            EdgeInsets.all(10 * fontSizeScale),
                                         decoration: BoxDecoration(
-                                          color: isMe ? MessengerTheme.lightAccent : Theme.of(context).colorScheme.surface,
+                                          color: isMe
+                                              ? MessengerTheme.lightAccent
+                                              : Theme.of(context)
+                                                  .colorScheme
+                                                  .surface,
                                           borderRadius: BorderRadius.only(
-                                            topLeft: Radius.circular(isMe ? MessengerTheme.radiusLG * fontSizeScale : MessengerTheme.radiusSM * fontSizeScale),
-                                            topRight: Radius.circular(isMe ? MessengerTheme.radiusSM * fontSizeScale : MessengerTheme.radiusLG * fontSizeScale),
-                                            bottomLeft: Radius.circular(MessengerTheme.radiusLG * fontSizeScale),
-                                            bottomRight: Radius.circular(MessengerTheme.radiusLG * fontSizeScale),
+                                            topLeft: Radius.circular(isMe
+                                                ? MessengerTheme.radiusLG *
+                                                    fontSizeScale
+                                                : MessengerTheme.radiusSM *
+                                                    fontSizeScale),
+                                            topRight: Radius.circular(isMe
+                                                ? MessengerTheme.radiusSM *
+                                                    fontSizeScale
+                                                : MessengerTheme.radiusLG *
+                                                    fontSizeScale),
+                                            bottomLeft: Radius.circular(
+                                                MessengerTheme.radiusLG *
+                                                    fontSizeScale),
+                                            bottomRight: Radius.circular(
+                                                MessengerTheme.radiusLG *
+                                                    fontSizeScale),
                                           ),
                                           boxShadow: isHighlighted
                                               ? [
                                                   BoxShadow(
-                                                    color: MessengerTheme.lightAccent.withOpacity(0.8),
+                                                    color: MessengerTheme
+                                                        .lightAccent
+                                                        .withOpacity(0.8),
                                                     blurRadius: 20,
                                                     spreadRadius: 4,
                                                     offset: Offset.zero,
                                                   ),
                                                   BoxShadow(
-                                                    color: Colors.white.withOpacity(0.3),
+                                                    color: Colors.white
+                                                        .withOpacity(0.3),
                                                     blurRadius: 10,
                                                     spreadRadius: 2,
                                                     offset: Offset.zero,
@@ -5407,12 +5593,13 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                               : null,
                                         ),
                                         child: Column(
-                                          crossAxisAlignment:
-                                              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                          crossAxisAlignment: isMe
+                                              ? CrossAxisAlignment.end
+                                              : CrossAxisAlignment.start,
                                           children: [
                                             _buildForwardedMessageHeader(msg),
-                                            
-                                            if (favoritesProvider.isMessageFavorite(msg.id))
+                                            if (favoritesProvider
+                                                .isMessageFavorite(msg.id))
                                               Align(
                                                 alignment: Alignment.topRight,
                                                 child: Icon(
@@ -5421,10 +5608,10 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                                   color: Colors.amber,
                                                 ),
                                               ),
-                                            
                                             if (msg.typeId == 4)
                                               _buildVoiceMessage(msg, isMe)
-                                            else if (msg.fileUrl != null && msg.fileUrl!.isNotEmpty)
+                                            else if (msg.fileUrl != null &&
+                                                msg.fileUrl!.isNotEmpty)
                                               if (msg.typeId == 2)
                                                 _buildImageMessage(msg, isMe)
                                               else if (msg.typeId == 3)
@@ -5435,27 +5622,36 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                                 _buildImageMessage(msg, isMe)
                                               else
                                                 _buildFileMessage(msg, isMe),
-                                            
                                             if (msg.text.isNotEmpty &&
                                                 msg.typeId != 4 &&
                                                 msg.text != 'Файл' &&
                                                 !msg.text.startsWith('Файл:'))
                                               Padding(
-                                                padding: EdgeInsets.only(bottom: 4 * fontSizeScale),
+                                                padding: EdgeInsets.only(
+                                                    bottom: 4 * fontSizeScale),
                                                 child: Text(
                                                   msg.text,
                                                   style: TextStyle(
-                                                    fontSize: 16 * fontSizeScale,
-                                                    color: isMe ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                                                    fontSize:
+                                                        16 * fontSizeScale,
+                                                    color: isMe
+                                                        ? Colors.white
+                                                        : Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurface,
                                                   ),
                                                 ),
                                               ),
-                                            
                                             Text(
                                               timeString,
                                               style: TextStyle(
                                                 fontSize: 11 * fontSizeScale,
-                                                color: isMe ? Colors.white70 : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                                color: isMe
+                                                    ? Colors.white70
+                                                    : Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurface
+                                                        .withOpacity(0.6),
                                               ),
                                             ),
                                           ],
@@ -5466,43 +5662,40 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                 );
                               },
                             ),
-                            
                             _buildPinnedMessagesList(),
                           ],
                         ),
                 ),
                 if (_showEmojiPicker) _buildEmojiPicker(),
                 _buildAttachedFiles(),
-                
                 if (!_isChatBlocked) ...[
                   Container(
                     padding: EdgeInsets.symmetric(
-                      horizontal: 8 * fontSizeScale,
-                      vertical: 6 * fontSizeScale
-                    ),
+                        horizontal: 8 * fontSizeScale,
+                        vertical: 6 * fontSizeScale),
                     color: Theme.of(context).colorScheme.surface,
                     child: Row(
                       children: [
                         _buildRecordingControls(),
-                        
                         Expanded(
                           child: Container(
-                            margin: EdgeInsets.symmetric(horizontal: 8 * fontSizeScale),
+                            margin: EdgeInsets.symmetric(
+                                horizontal: 8 * fontSizeScale),
                             child: RawKeyboardListener(
-                              focusNode: FocusNode(),
+                              focusNode: _rawKeyboardFocusNode,
                               onKey: (RawKeyEvent event) {
                                 if (event is RawKeyDownEvent) {
-                                  if (event.logicalKey == LogicalKeyboardKey.shiftLeft ||
-                                      event.logicalKey == LogicalKeyboardKey.shiftRight) {
+                                  if (event.logicalKey ==
+                                          LogicalKeyboardKey.shiftLeft ||
+                                      event.logicalKey ==
+                                          LogicalKeyboardKey.shiftRight) {
                                     _shiftPressed = true;
                                   }
-                                  if (event.logicalKey == LogicalKeyboardKey.enter &&
-                                      !_shiftPressed) {
-                                    _sendMessage();
-                                  }
                                 } else if (event is RawKeyUpEvent) {
-                                  if (event.logicalKey == LogicalKeyboardKey.shiftLeft ||
-                                      event.logicalKey == LogicalKeyboardKey.shiftRight) {
+                                  if (event.logicalKey ==
+                                          LogicalKeyboardKey.shiftLeft ||
+                                      event.logicalKey ==
+                                          LogicalKeyboardKey.shiftRight) {
                                     _shiftPressed = false;
                                   }
                                 }
@@ -5518,25 +5711,32 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                                 style: TextStyle(fontSize: 16 * fontSizeScale),
                                 decoration: InputDecoration(
                                   hintText: _hasAttachments
-                                    ? 'Введите сообщение (с файлами)'
-                                    : 'Введите сообщение',
-                                  hintStyle: TextStyle(fontSize: 16 * fontSizeScale),
+                                      ? 'Введите сообщение (с файлами)'
+                                      : 'Введите сообщение',
+                                  hintStyle:
+                                      TextStyle(fontSize: 16 * fontSizeScale),
                                   border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  disabledBorder: InputBorder.none,
+                                  filled: false,
                                   contentPadding: EdgeInsets.symmetric(
                                     horizontal: 12 * fontSizeScale,
-                                    vertical: 12 * fontSizeScale
+                                    vertical: 12 * fontSizeScale,
                                   ),
                                 ),
                                 onSubmitted: (text) {
+                                  // Нажатие Enter отправляет сообщение, Shift+Enter делает новую строку
                                   if (!_shiftPressed) {
                                     _sendMessage();
                                   }
+                                  // Если Shift нажат, то TextField сам добавит новую строку
+                                  // и не будет отправлять сообщение
                                 },
                               ),
                             ),
                           ),
                         ),
-                        
                         _buildRightButtons(),
                       ],
                     ),
@@ -5544,13 +5744,17 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 ] else ...[
                   Container(
                     padding: EdgeInsets.all(16 * fontSizeScale),
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.1),
+                    color:
+                        Theme.of(context).colorScheme.surface.withOpacity(0.1),
                     child: Center(
                       child: Text(
                         'Чат заблокирован. Вы не можете отправлять сообщения',
                         style: TextStyle(
                           fontSize: 14 * fontSizeScale,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.6),
                           fontStyle: FontStyle.italic,
                         ),
                       ),

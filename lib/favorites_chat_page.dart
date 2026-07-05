@@ -1,4 +1,3 @@
-// favorites_chat_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
@@ -24,57 +23,69 @@ class FavoritesChatPage extends StatefulWidget {
   _FavoritesChatPageState createState() => _FavoritesChatPageState();
 }
 
-class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTickerProviderStateMixin {
+class _FavoritesChatPageState extends State<FavoritesChatPage>
+    with SingleTickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _controller = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
-  final focusNode = FocusNode();
+  final FocusNode focusNode = FocusNode();
+  final FocusNode _rawKeyboardFocusNode = FocusNode();
   bool _showScrollDownButton = false;
   bool _showSearch = false;
   bool _showEmojiPicker = false;
   late TabController _tabController;
-  
+
   // Сервис голосовых сообщений
   late VoiceService _voiceService;
   bool _audioAvailable = false;
   bool _audioInitialized = false;
   bool _microphonePermissionGranted = false;
-  
+
   // Состояние воспроизведения аудио
   bool _isPlaying = false;
   int? _playingMessageId;
-  
+
   // Прикрепленные файлы
   List<XFile> _attachedFiles = [];
   bool _hasAttachments = false;
-  
+
   // Поиск
   List<FavoriteMessage> _searchResults = [];
   int _currentSearchIndex = -1;
-  
+
   // Флаг для Shift
   bool _shiftPressed = false;
 
   @override
   void initState() {
     super.initState();
-    
+
     // Инициализация сервиса голосовых сообщений
     _voiceService = VoiceService();
-    
+
     _scrollController.addListener(_scrollListener);
     _tabController = TabController(
       length: EmojiData.categories.length,
       vsync: this,
     );
-    
+
     _initializeServices();
-    
+
     // Слушаем изменения текста
     _controller.addListener(_updateSendButtonState);
-    
+
     // Настраиваем слушатели состояния воспроизведения
     _setupVoiceServiceListeners();
+
+    // Отложенный фокус на поле ввода
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          focusNode.requestFocus();
+          _rawKeyboardFocusNode.requestFocus();
+        }
+      });
+    });
   }
 
   void _setupVoiceServiceListeners() {
@@ -83,7 +94,7 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
         _isPlaying = isPlaying;
       });
     };
-    
+
     _voiceService.onPlayingMessageIdChanged = (messageId) {
       setState(() {
         _playingMessageId = messageId;
@@ -98,13 +109,13 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
   Future<void> _initializeServices() async {
     try {
       await _voiceService.initialize();
-      
+
       // Проверяем разрешение микрофона
-      _microphonePermissionGranted = await _voiceService.checkMicrophonePermission();
-      
+      _microphonePermissionGranted =
+          await _voiceService.checkMicrophonePermission();
+
       _audioAvailable = true;
       _audioInitialized = true;
-      
     } catch (e) {
       _audioInitialized = true;
       _audioAvailable = false;
@@ -118,13 +129,15 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
     _searchController.dispose();
     _scrollController.dispose();
     focusNode.dispose();
+    _rawKeyboardFocusNode.dispose();
     _tabController.dispose();
     _voiceService.dispose();
     super.dispose();
   }
 
   void _scrollListener() {
-    if (_scrollController.offset < _scrollController.position.maxScrollExtent - 300) {
+    if (_scrollController.offset <
+        _scrollController.position.maxScrollExtent - 300) {
       if (!_showScrollDownButton) setState(() => _showScrollDownButton = true);
     } else {
       if (_showScrollDownButton) setState(() => _showScrollDownButton = false);
@@ -165,10 +178,11 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
       return;
     }
 
-    final favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
+    final favoritesProvider =
+        Provider.of<FavoritesProvider>(context, listen: false);
     final results = favoritesProvider.favoriteMessages.where((favMessage) {
       return favMessage.text.toLowerCase().contains(query.toLowerCase()) ||
-             favMessage.chatTitle.toLowerCase().contains(query.toLowerCase());
+          favMessage.chatTitle.toLowerCase().contains(query.toLowerCase());
     }).toList();
 
     setState(() {
@@ -181,15 +195,18 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
     if (_searchResults.isEmpty) return;
 
     setState(() {
-      _currentSearchIndex = (_currentSearchIndex + direction) % _searchResults.length;
-      if (_currentSearchIndex < 0) _currentSearchIndex = _searchResults.length - 1;
+      _currentSearchIndex =
+          (_currentSearchIndex + direction) % _searchResults.length;
+      if (_currentSearchIndex < 0)
+        _currentSearchIndex = _searchResults.length - 1;
     });
 
     _scrollToSearchResult(_searchResults[_currentSearchIndex]);
   }
 
   void _scrollToSearchResult(FavoriteMessage favMessage) {
-    final favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
+    final favoritesProvider =
+        Provider.of<FavoritesProvider>(context, listen: false);
     final index = favoritesProvider.favoriteMessages.indexOf(favMessage);
     if (index != -1 && _scrollController.hasClients) {
       _scrollController.animateTo(
@@ -276,14 +293,15 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
   }
 
   // ========== ВИДЖЕТЫ ДЛЯ СООБЩЕНИЙ ==========
-  Widget _buildMessageItem(FavoriteMessage favMessage, double fontSizeScale, bool isSearchResult, bool isCurrentSearchResult) {
+  Widget _buildMessageItem(FavoriteMessage favMessage, double fontSizeScale,
+      bool isSearchResult, bool isCurrentSearchResult) {
     final isMe = favMessage.originalUserId == widget.myUserId;
-    
+
     return GestureDetector(
       onLongPress: () => _showMessageMenu(favMessage, fontSizeScale),
       child: Container(
         decoration: BoxDecoration(
-          color: isCurrentSearchResult 
+          color: isCurrentSearchResult
               ? Colors.yellow.withOpacity(0.3)
               : isSearchResult
                   ? Colors.yellow.withOpacity(0.1)
@@ -300,7 +318,8 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
             borderRadius: BorderRadius.circular(12 * fontSizeScale),
           ),
           child: Column(
-            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            crossAxisAlignment:
+                isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
               // Заголовок чата
               Container(
@@ -310,7 +329,8 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
                   vertical: 4 * fontSizeScale,
                 ),
                 decoration: BoxDecoration(
-                  color: isMe ? Colors.white.withOpacity(0.2) : Colors.grey[300],
+                  color:
+                      isMe ? Colors.white.withOpacity(0.2) : Colors.grey[300],
                   borderRadius: BorderRadius.circular(8 * fontSizeScale),
                 ),
                 child: Row(
@@ -333,7 +353,7 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
                   ],
                 ),
               ),
-              
+
               // Текст сообщения
               if (favMessage.text.isNotEmpty)
                 Padding(
@@ -346,10 +366,11 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
                     ),
                   ),
                 ),
-              
+
               // Информация о времени
               Row(
-                mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                mainAxisAlignment:
+                    isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
                 children: [
                   Text(
                     '${favMessage.createdAt.hour.toString().padLeft(2, '0')}:${favMessage.createdAt.minute.toString().padLeft(2, '0')}',
@@ -426,7 +447,7 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
         IconButton(
           icon: Icon(
             Icons.emoji_emotions_outlined,
-            color: Color(0xFFFF9800),
+            color: const Color(0xFFFF9800),
             size: 28 * fontSizeScale,
           ),
           onPressed: _toggleEmojiPicker,
@@ -434,7 +455,7 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
         IconButton(
           icon: Icon(
             Icons.attach_file,
-            color: Color(0xFFFF9800),
+            color: const Color(0xFFFF9800),
             size: 28 * fontSizeScale,
           ),
           onPressed: _attachFile,
@@ -453,9 +474,8 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
         _attachedFiles.addAll(files);
         _hasAttachments = true;
       });
-      
+
       focusNode.requestFocus();
-      
     } catch (e) {
       print('Ошибка при выборе файлов: $e');
     }
@@ -472,11 +492,11 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
     final recordingState = _voiceService.recordingState;
     final isRecording = recordingState == RecordingState.recording;
     final isStopped = recordingState == RecordingState.stopped;
-    
-    final isActive = _controller.text.trim().isNotEmpty || 
-                     _attachedFiles.isNotEmpty ||
-                     isStopped;
-    
+
+    final isActive = _controller.text.trim().isNotEmpty ||
+        _attachedFiles.isNotEmpty ||
+        isStopped;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.end,
@@ -493,36 +513,39 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
               focusNode.requestFocus();
             },
           ),
-        
         SizedBox(width: (isRecording || isStopped ? 4 : 0) * fontSizeScale),
-        
         if (!isRecording && !isStopped)
           IconButton(
             icon: Icon(
               Icons.mic,
-              color: _audioAvailable && _audioInitialized && _microphonePermissionGranted
-                  ? Color(0xFFFF9800) 
+              color: _audioAvailable &&
+                      _audioInitialized &&
+                      _microphonePermissionGranted
+                  ? const Color(0xFFFF9800)
                   : Colors.grey,
               size: 28 * fontSizeScale,
             ),
-            onPressed: _audioAvailable && _audioInitialized && _microphonePermissionGranted
-                ? _startRecording 
+            onPressed: _audioAvailable &&
+                    _audioInitialized &&
+                    _microphonePermissionGranted
+                ? _startRecording
                 : null,
           ),
-        
         SizedBox(width: 4 * fontSizeScale),
-        
         MouseRegion(
-          cursor: isActive ? SystemMouseCursors.click : SystemMouseCursors.basic,
+          cursor:
+              isActive ? SystemMouseCursors.click : SystemMouseCursors.basic,
           child: IconButton(
             icon: Icon(
               Icons.send,
-              color: isActive ? Color(0xFFFF9800) : Colors.grey[400],
+              color: isActive ? const Color(0xFFFF9800) : Colors.grey[400],
               size: 28 * fontSizeScale,
             ),
-            onPressed: isActive ? () async {
-              await _sendMessage();
-            } : null,
+            onPressed: isActive
+                ? () async {
+                    await _sendMessage();
+                  }
+                : null,
           ),
         ),
       ],
@@ -533,11 +556,11 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
     if (!_audioInitialized) {
       return;
     }
-    
+
     if (!_microphonePermissionGranted) {
       return;
     }
-    
+
     try {
       await _voiceService.startRecording();
     } catch (e) {
@@ -547,7 +570,7 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
 
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
-    
+
     // Проверяем наличие голосового сообщения для отправки
     final hasVoiceMessage = await _voiceService.hasVoiceMessage;
     if (hasVoiceMessage) {
@@ -572,7 +595,7 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
       _hasAttachments = false;
       _showEmojiPicker = false;
     });
-    
+
     focusNode.requestFocus();
   }
 
@@ -637,7 +660,8 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
                       onTap: () => _addEmoji(emojis[index]),
                       child: Container(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8 * fontSizeScale),
+                          borderRadius:
+                              BorderRadius.circular(8 * fontSizeScale),
                           color: Colors.transparent,
                         ),
                         child: Center(
@@ -684,8 +708,8 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
               return Chip(
                 label: Text(
                   fileName.length > 15
-                    ? '${fileName.substring(0, 15)}...'
-                    : fileName,
+                      ? '${fileName.substring(0, 15)}...'
+                      : fileName,
                   style: TextStyle(fontSize: 12 * fontSizeScale),
                 ),
                 deleteIcon: Icon(
@@ -739,7 +763,7 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
               ListTile(
                 leading: Icon(
                   Icons.copy,
-                  color: Color(0xFFFF9800),
+                  color: const Color(0xFFFF9800),
                   size: 24 * fontSizeScale,
                 ),
                 title: Text(
@@ -812,10 +836,12 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
     return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
-  Widget _buildEmptyState(double fontSizeScale) {
+  Widget _buildEmptyState(double fontSizeScale, double textFieldHeight) {
     return Center(
       child: Padding(
-        padding: EdgeInsets.all(32.0 * fontSizeScale),
+        padding: EdgeInsets.only(
+          bottom: textFieldHeight + 20 * fontSizeScale,
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -855,7 +881,18 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
   Widget build(BuildContext context) {
     final fontSizeScale = Provider.of<FontScaleProvider>(context).fontSizeScale;
     final favorites = Provider.of<FavoritesProvider>(context).favoriteMessages;
-    final displayList = _showSearch && _searchResults.isNotEmpty ? _searchResults : favorites;
+    final displayList =
+        _showSearch && _searchResults.isNotEmpty ? _searchResults : favorites;
+
+    // Вычисляем высоту поля ввода + панели управления
+    final textFieldHeight = _controller.text.isNotEmpty
+        ? (_controller.text.split('\n').length * 20 * fontSizeScale +
+            40 * fontSizeScale)
+        : 60 * fontSizeScale;
+    final maxTextFieldHeight = 200 * fontSizeScale;
+    final actualTextFieldHeight = textFieldHeight > maxTextFieldHeight
+        ? maxTextFieldHeight
+        : textFieldHeight;
 
     return Scaffold(
       appBar: AppBar(
@@ -897,23 +934,22 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
             _buildSearchBar(fontSizeScale),
             Expanded(
               child: displayList.isEmpty
-                  ? _buildEmptyState(fontSizeScale)
+                  ? _buildEmptyState(
+                      fontSizeScale, actualTextFieldHeight + 20 * fontSizeScale)
                   : ListView.builder(
                       controller: _scrollController,
                       itemCount: displayList.length,
                       itemBuilder: (context, index) {
                         final favMessage = displayList[index];
-                        final isSearchResult = _searchResults.contains(favMessage);
-                        final isCurrentSearchResult = _searchResults.isNotEmpty && 
-                            _currentSearchIndex >= 0 && 
+                        final isSearchResult =
+                            _searchResults.contains(favMessage);
+                        final isCurrentSearchResult = _searchResults
+                                .isNotEmpty &&
+                            _currentSearchIndex >= 0 &&
                             _searchResults[_currentSearchIndex] == favMessage;
-                        
-                        return _buildMessageItem(
-                          favMessage, 
-                          fontSizeScale, 
-                          isSearchResult, 
-                          isCurrentSearchResult
-                        );
+
+                        return _buildMessageItem(favMessage, fontSizeScale,
+                            isSearchResult, isCurrentSearchResult);
                       },
                     ),
             ),
@@ -926,26 +962,38 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
               ),
               color: Colors.grey[100],
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   // Левая часть - кнопки
-                  _buildRecordingControls(fontSizeScale),
-                  
+                  Padding(
+                    padding: EdgeInsets.only(bottom: 4 * fontSizeScale),
+                    child: _buildRecordingControls(fontSizeScale),
+                  ),
+
                   // Центральная часть - поле ввода
                   Expanded(
                     child: Container(
-                      margin: EdgeInsets.symmetric(horizontal: 8 * fontSizeScale),
+                      margin:
+                          EdgeInsets.symmetric(horizontal: 8 * fontSizeScale),
+                      constraints: BoxConstraints(
+                        maxHeight: maxTextFieldHeight,
+                      ),
                       child: RawKeyboardListener(
-                        focusNode: FocusNode(),
+                        focusNode: _rawKeyboardFocusNode,
                         onKey: (RawKeyEvent event) {
                           // Отслеживаем нажатие Shift
                           if (event is RawKeyDownEvent) {
-                            if (event.logicalKey == LogicalKeyboardKey.shiftLeft ||
-                                event.logicalKey == LogicalKeyboardKey.shiftRight) {
+                            if (event.logicalKey ==
+                                    LogicalKeyboardKey.shiftLeft ||
+                                event.logicalKey ==
+                                    LogicalKeyboardKey.shiftRight) {
                               _shiftPressed = true;
                             }
                           } else if (event is RawKeyUpEvent) {
-                            if (event.logicalKey == LogicalKeyboardKey.shiftLeft ||
-                                event.logicalKey == LogicalKeyboardKey.shiftRight) {
+                            if (event.logicalKey ==
+                                    LogicalKeyboardKey.shiftLeft ||
+                                event.logicalKey ==
+                                    LogicalKeyboardKey.shiftRight) {
                               _shiftPressed = false;
                             }
                           }
@@ -959,11 +1007,16 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
                           textInputAction: TextInputAction.newline,
                           style: TextStyle(fontSize: 16 * fontSizeScale),
                           decoration: InputDecoration(
-                            hintText: _hasAttachments 
-                              ? AppLocalizations.of(context)!.enterMessageWithFiles
-                              : AppLocalizations.of(context)!.enterMessage,
+                            hintText: _hasAttachments
+                                ? AppLocalizations.of(context)!
+                                    .enterMessageWithFiles
+                                : AppLocalizations.of(context)!.enterMessage,
                             hintStyle: TextStyle(fontSize: 16 * fontSizeScale),
                             border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            disabledBorder: InputBorder.none,
+                            filled: false,
                             contentPadding: EdgeInsets.symmetric(
                               horizontal: 12 * fontSizeScale,
                               vertical: 12 * fontSizeScale,
@@ -979,9 +1032,12 @@ class _FavoritesChatPageState extends State<FavoritesChatPage> with SingleTicker
                       ),
                     ),
                   ),
-                  
+
                   // Правая часть - кнопки
-                  _buildRightButtons(fontSizeScale),
+                  Padding(
+                    padding: EdgeInsets.only(bottom: 4 * fontSizeScale),
+                    child: _buildRightButtons(fontSizeScale),
+                  ),
                 ],
               ),
             ),

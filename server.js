@@ -533,7 +533,9 @@ const authLimiter = rateLimit({
     error: 'Слишком много попыток входа. Попробуйте через 15 минут.' 
   },
   keyGenerator: (req) => {
-    return req.ip + (req.body.email || '');
+    // Используем ipKeyGenerator для правильной обработки IPv6
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    return ip + (req.body.email || '');
   }
 });
 
