@@ -3501,11 +3501,19 @@ app.put('/api/user', authMiddleware, uploadAvatar.single('avatar'), async (req, 
       gender
     });
     
-    const trimmedName = name ? name.trim() : '';
+        const trimmedName = name ? name.trim() : '';
     const trimmedNickname = nickname ? nickname.trim() : '';
     
+    // Проверяем, есть ли у пользователя уже имя или никнейм в БД
     if (!trimmedName && !trimmedNickname) {
-      return res.status(400).json({ error: 'Заполните хотя бы одно поле: имя или никнейм' });
+      const { rows: [existingUser] } = await pool.query(
+        'SELECT name, nickname FROM users WHERE id = $1', [userId]
+      );
+      const hasName = existingUser?.name ? decryptString(existingUser.name).trim() : '';
+      const hasNickname = existingUser?.nickname ? decryptString(existingUser.nickname).trim() : '';
+      if (!hasName && !hasNickname) {
+        return res.status(400).json({ error: 'Заполните хотя бы одно поле: имя или никнейм' });
+      }
     }
 
     if (trimmedNickname) {
